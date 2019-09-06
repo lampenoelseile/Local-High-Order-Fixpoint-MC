@@ -1,7 +1,8 @@
 open Tcsbasedata
 open Tcsset
 
-              
+
+(* TODO: remove unused methods *)  
 (** Type for nodes. Currently  represented as integer value.
     WARNING: May becomes abstract in the future.
 *)
@@ -25,13 +26,6 @@ module NodeSet : sig
       @param node node to be checked
       @param t set to check if node is included
       @return if node is included
-   *)
-
-   val compare : t -> t -> int
-   (** Compares two nodesets.
-      @param t nodeset ns_one to compare
-      @param t nodeset ns_two to compare with
-      @return -1 if ns_one < ns_two, 0 if ns_one = ns_two, 1 if ns_one > ns_two
    *)
 
    val empty   : t
@@ -137,6 +131,19 @@ module NodeSet : sig
       @return unified nodeset from nodeset one and nodeset two
    *)
 
+   val inter : t -> t -> t
+   (** Returns intersection of two nodesets.
+       @param t nodeset
+       @param t nodeset
+       @return intersection of both 
+   *)
+
+   val diff : t -> t -> t
+   (** Subtracts second nodeset from first one (takes difference)
+       @param t nodeset_1 to be subtracted from
+       @param t nodeset_2 to subtract
+       @return nodeset_1 \ nodeset_2
+   *)
    val as_node_list   : t -> node list
    (** Extract a list of nodes from a nodeset.
       @param t nodeset to extract nodes as list from

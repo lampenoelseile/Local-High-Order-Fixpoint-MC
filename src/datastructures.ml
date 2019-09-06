@@ -27,6 +27,8 @@ module NodeSet = struct
   let add = TreeSet.add
   let del = TreeSet.remove
   let union = TreeSet.union
+  let inter = TreeSet.inter
+  let diff = TreeSet.diff
   let of_node_list = TreeSet.of_list Int.compare
   let as_node_list = TreeSet.elements
 

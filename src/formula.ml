@@ -3,22 +3,21 @@ type v_type =
   | Base
 	| Fun of v_type * v_type
 
-type formula = 
+type t = 
   | Const of bool
   | Prop of string
   | Var of string * v_type
-  | Int of int
-  | Neg of formula
-  | Conj of formula * formula
-  | Disj of formula * formula
-  | Impl of formula * formula
-  | Equiv of formula * formula
-  | Diamond of string * formula
-  | Box of string * formula
-  | Mu of string * v_type * formula
-  | Nu of string * v_type * formula 
-  | Lambda of string * v_type * formula
-  | App of formula * formula
+  | Neg of t
+  | Conj of t * t
+  | Disj of t * t
+  | Impl of t * t
+  | Equiv of t * t
+  | Diamond of string * t
+  | Box of string * t
+  | Mu of string * v_type * t
+  | Nu of string * v_type * t 
+  | Lambda of string * v_type * t
+  | App of t * t
 
 
 let rec string_of_v_type = function
@@ -33,7 +32,6 @@ let string_of_formula ?(show_types=false) phi =
     | Const(b) -> if b then "true" else "false"
     | Prop(prop_var) -> Format.sprintf "%s" prop_var
     | Var(var,t) -> s_type var t
-    | Int(i) -> Format.sprintf "%d" i
     | Neg(phi) -> Format.sprintf "~%s" (f phi) 
     | Conj(phi1, phi2) -> Format.sprintf "(%s && %s)" (f phi1) (f phi2) 
     | Disj(phi1, phi2) -> Format.sprintf "(%s || %s)" (f phi1) (f phi2) 

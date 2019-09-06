@@ -20,7 +20,8 @@ val create_random : int -> string list -> string list -> float -> float -> t
     @return randomly-generated lts
 *)
 
-(* we'll see later if needed :val add_transition : t -> string -> node -> node -> t
+(* we'll see later if needed :
+val add_transition : t -> string -> node -> node -> t
 (** Adds new edge to LTS.
     @param t LTS
     @param string transition
@@ -37,6 +38,11 @@ val add_proposition : t -> node -> string -> t
     @return LTS with updated propset of node
 *) *)
 
+val get_all_nodes : t -> NodeSet.t
+(**  Returns complete nodeset of lts.
+     @param t LTS
+     @return nodeset
+*)
 val get_trans_predecessors_of_node : t -> string -> node -> NodeSet.t
 (** Returns predecessors of given node.
     @param t LTS

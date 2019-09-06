@@ -151,6 +151,8 @@ let create_random node_count trans_as_string_list props_as_string_list edge_load
   List.iter (fun t -> List.iter (fun e -> let (a,b) = e in lts := add_transition !lts t a b) (rand_select all_edges edge_load_of_list)) trans_as_string_list;
   !lts
 
+let get_all_nodes lts =
+  lts.nodes
 let get_trans_predecessors_of_node lts trans node =
   TransitionMap.get_tsuccessors_of_node lts.transitions trans node
 
