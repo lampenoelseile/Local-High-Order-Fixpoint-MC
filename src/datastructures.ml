@@ -44,6 +44,12 @@ module NodeSet = struct
   let max ns lessf = fold (fun v -> fun w -> if lessf v w then w else v) (some ns) ns
 
   let to_string ns = "["^(String.concat "," (List.map node_to_string (as_node_list ns)))^"]"
+
+  let init =
+    let rec f ns = function
+      | 0 -> add 0 ns
+      | c -> f (add c ns) (c-1) in
+      f empty
 end
 
 (* PROPOSITION SET *)

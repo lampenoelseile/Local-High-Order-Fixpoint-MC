@@ -147,6 +147,11 @@ module NodeSet : sig
       @param t nodeset to be represented
       @return string representation 
    *)
+   val init : int -> t
+   (** Returns initialized nodeset with number of given int nodes.
+      @param nodecount nodes to be added (0... nodecount)
+      @return initialized nodeset 
+   *)
 end
 
 (** Type for set of propositions. Based on TreeSet. Propositions are represented as strings (e.g "p", "q")

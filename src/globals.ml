@@ -1,6 +1,7 @@
 open Lexing
 open Parsing
 
+(* TODO: Delete deprecated stuff and comment remaining.*)
 
 (** MISC **)
 (** computes the list of sublists *)

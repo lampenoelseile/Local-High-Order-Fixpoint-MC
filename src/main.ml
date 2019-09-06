@@ -35,6 +35,6 @@ let parsee_command_line () =
 
 let _ =
   let f = App(Lambda("X", Fun(Base, Base), Equiv( App(Var("X", Fun(Base, Base)), Prop("p")), Const(false))), Lambda("Y", Base, Var("Y", Base))) in
-  let lts = ref (Lts.create_random 10 ["p"; "q"; "z"; "y"] 0.5 0.3) in
+  let lts = ref (Lts.create_random 20 ["a"; "b"; "c"] ["p"; "q"; "r"; "s"] 0.1 0.8) in
   Lts.print !lts;
   print_endline (string_of_formula ~show_types:false f);

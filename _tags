@@ -1,1 +1,3 @@
+#not this naive solution
+
 true: package(TCSLib), package(str)

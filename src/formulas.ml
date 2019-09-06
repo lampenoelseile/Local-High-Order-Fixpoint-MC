@@ -1,3 +1,4 @@
+(* TODO: check whats needed and comment remaining.*)
 type v_type = 
   | Base
 	| Fun of v_type * v_type
@@ -24,12 +25,6 @@ let rec string_of_v_type = function
   | Base -> "base"
   | Fun(a,b) -> Format.sprintf "%s -> %s" (string_of_v_type a) (string_of_v_type b)
 
-(** Converts formula into string representation.
-
-    @param bool flag if types should be printed
-    @param formula formula to be converted
-    @return string  string representation of formula
-*)
 let string_of_formula ?(show_types=false) phi = 
   let s_type id t = 
     if show_types then Format.sprintf "(%s:%s)" id (string_of_v_type t)
