@@ -73,7 +73,7 @@ end
 type propkeys = string
 (* type of propositions for propmap. 
    has to be out of PropMap scope because of type inference reasons? 
-   at least compiler complains about it 
+   at least the compiler complains about it. 
 *)
 
 module PropMap = struct
