@@ -1,5 +1,6 @@
 open Datastructures
 open Lts
-open Formula
+open Hfl
+open Tcsset
 
 val model_check : Lts.t -> Formula.t -> NodeSet.t
