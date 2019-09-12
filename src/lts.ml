@@ -165,13 +165,13 @@ let get_nodes_of_proposition lts prop =
 let to_string lts =
   let string_rep = ref "" in
   let active_tkeys = TransitionMap.get_keys_as_list lts.transitions in
-  string_rep := "legend: node (trans [pred] [succ])* props:";
+  string_rep := "node (trans [pred] [succ])* props:";
   NodeSet.iter (fun n -> 
                   let str = ref (string_of_int n) in 
                   List.iter (fun t  ->
                               let tpred_str = NodeSet.to_string (TransitionMap.get_tpredecessors_of_node lts.transitions t n) in
                               let tsucc_str = NodeSet.to_string (TransitionMap.get_tsuccessors_of_node lts.transitions t n) in 
-                              str := !str ^ " " ^ t ^ "-trans " ^ tpred_str ^ " " ^ tsucc_str) active_tkeys; 
+                              str := "  " ^ !str ^ " " ^ t ^ "-trans " ^ tpred_str ^ " " ^ tsucc_str) active_tkeys; 
                   str := !str ^ " props: " ^ (PropSet.to_string (PropMap.get_props_of_node lts.propositions n)); 
                   string_rep := String.concat "\n" [!string_rep;!str]) lts.nodes;
   !string_rep
