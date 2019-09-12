@@ -58,7 +58,7 @@ module Formula = struct
     | Lambda of string * variable_t * t
     | App of t * t
 
-  let string_of_formula ?(show_types=false) phi = 
+  let to_string ?(show_types=false) phi = 
     let s_type id t = 
       if show_types then Format.sprintf "(%s:%s)" id (string_of_var_t t)
       else id in

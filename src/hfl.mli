@@ -60,7 +60,7 @@ module Formula : sig
     | Lambda of string * variable_t * t
     | App of t * t
 
-  val string_of_formula : ?show_types:bool -> t -> string
+  val to_string : ?show_types:bool -> t -> string
   (** Converts formula into string representation.
 
       @param bool flag if types should be printed

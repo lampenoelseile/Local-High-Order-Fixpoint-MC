@@ -66,7 +66,7 @@ val get_nodes_of_proposition : t -> string -> NodeSet.t
     @return nodeset where proposition is valid
  *)
 
-val print : t -> unit
+val to_string : t -> string
 (** Makes console output of current LTS.
     @param t lts to be printed
  *)
