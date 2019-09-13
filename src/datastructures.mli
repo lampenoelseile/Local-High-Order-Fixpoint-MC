@@ -144,6 +144,9 @@ module NodeSet : sig
        @param t nodeset_2 to subtract
        @return nodeset_1 \ nodeset_2
    *)
+
+   val fold_subsets : (t -> 'a -> 'a) -> t -> 'a -> 'a 
+   
    val as_node_list   : t -> node list
    (** Extract a list of nodes from a nodeset.
       @param t nodeset to extract nodes as list from

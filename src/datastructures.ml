@@ -31,6 +31,7 @@ module NodeSet = struct
   let diff = TreeSet.diff
   let of_node_list = TreeSet.of_list Int.compare
   let as_node_list = TreeSet.elements
+  let fold_subsets = TreeSet.fold_subsets
 
   let find f ns =
       OptionUtils.get_some (fold (fun a v -> if a = None && f v then Some v else a) None ns)

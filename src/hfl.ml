@@ -1,43 +1,13 @@
 (* For high-level info about public parts see formulas.mli *)
 open Datastructures
 open Tcsset
+module V = Verbose
 
 (* TODO: check whats needed and comment remaining.*)
-
-module Semantics = struct
-  type t =
-    | Base of NodeSet.t
-    | Fun of (t,t) TreeMap.t
-  
-  let rec get_value_for_args = function
-    | Base(ns) -> (function
-                  | [] -> Base(ns)
-                  | _ -> print_endline "Error."; Base(ns))  
-    | Fun(map) -> (function
-                  | [] -> print_endline "Error."; Fun(map)
-                  | h :: t -> get_value_for_args (TreeMap.find h map) t)
-  
-  let rec set_value_for_args value = function
-    | Base(ns) -> (function
-                    | [] -> value
-                    | _ -> print_endline "Error: Arguments - Sem missmatch."; Base(ns))
-    | Fun(map) ->  (function
-                    | [] -> print_endline "Error: Arguments - Sem missmatch."; Fun(map)
-                    | h :: t -> Fun(TreeMap.add h (set_value_for_args value (TreeMap.find h map) t) map))
-
-  let rec is_defined_for_args = function
-    | Base(ns) -> (function
-                  | [] -> true
-                  | _ -> print_endline "Error."; false)
-    | Fun(map) -> (function
-                  | [] -> print_endline "Error."; false
-                  | h :: t -> if TreeMap.mem h map then true else is_defined_for_args (TreeMap.find h map) t)
-end
-
 module Formula = struct
   type variable_t = 
   | Base
-	| Fun of variable_t * variable_t
+  | Fun of variable_t * variable_t
 
   let rec string_of_var_t = function
   | Base -> "base"
@@ -87,4 +57,79 @@ module Formula = struct
     Format.sprintf "%s %s" (f_app phi) (f psi)
       | _ as phi -> f phi
     in f phi
-  end
+end
+  
+module Semantics = struct
+  type t =
+    | Base of NodeSet.t
+    | Fun of (t,t) TreeMap.t
+  
+  let empty_base = Base(NodeSet.empty)
+  let empty_fun = Fun(TreeMap.empty compare)
+
+  let rec to_string sem = 
+    match sem with
+    | Base(ns) -> NodeSet.to_string ns
+    | Fun(map) -> (TreeMap.fold (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") map "[") ^ "]"
+
+  (*TODO: Make output compact, add module etc*)
+  let rec is_defined_for_args ?(v_lvl=V.None) = function
+    | Base(ns) -> (function
+                  | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was of type Base and arglist empty: " ^ to_string (Base ns)); true
+                  | _ ->  V.console_out V.Debug v_lvl (fun () -> "Object was of type Base but arglist nonempty - Obj:" ^ to_string (Base ns)); 
+                          assert false)
+    | Fun(map) -> (function
+                  | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was not of type Base but arglist empty: " ^ to_string (Fun map));  
+                          assert false
+                  | h :: t ->  let value = TreeMap.mem h map in
+                                V.console_out V.Debug v_lvl (fun () -> "Definition of sem for " ^ to_string (Fun map) 
+                                                                        ^ " for "^ to_string h ^ " is "^ Bool.to_string value);
+                                value && is_defined_for_args ~v_lvl (TreeMap.find h map) t)
+
+  let rec get_value_for_args = function
+    | Base(ns) -> (function
+                  | [] -> Base(ns)
+                  | _ -> print_endline "Error."; Base(ns))  
+    | Fun(map) -> (function
+                  | [] -> print_endline "Error."; Fun(map)
+                  | h :: t -> get_value_for_args (TreeMap.find h map) t)
+  
+  (*TODO: Make verbose compact, add module etc*)
+  let rec set_value_for_args ?(v_lvl=V.None) value = function
+    | Base(ns) -> (function
+                    | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was of type Base and arglist empty: " ^ to_string (Base ns));
+                            value
+                    | _ ->  V.console_out V.Debug v_lvl (fun () -> "Object was of type Base but arglist nonempty: " ^ to_string (Base ns)); 
+                            assert false)
+    | Fun(map) ->  (function
+                    | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was not of type Base but arglist empty: " ^ to_string (Fun map)); 
+                            assert false
+                    | h :: [] -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set for arg -> ns object.");
+                                  Fun(TreeMap.add h value map);
+                    | h :: t -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set for fun object.");
+                                if is_defined_for_args ~v_lvl (Fun map) [h] then
+                                  Fun(TreeMap.add h (set_value_for_args ~v_lvl value (TreeMap.find h map) t) map)
+                                else
+                                  let new_map = empty_fun in 
+                                  Fun(TreeMap.add h (set_value_for_args ~v_lvl value new_map t) map))
+end
+
+(*SET OF SEMANTICS *)
+module SemanticsSet = struct
+  type t = Semantics.t TreeSet.t
+
+  let empty = TreeSet.empty compare
+  let add = TreeSet.add
+  let iter = TreeSet.iter
+  let fold = TreeSet.fold
+
+  let rec all_of_type lts = function
+      Formula.Base -> NodeSet.fold_subsets (fun ns sems -> add (Semantics.Base ns) sems) (Lts.get_all_nodes lts) empty
+    | Formula.Fun(key_t, val_t) -> empty
+
+  let to_string sems =
+    (fold (fun sem str -> match sem with
+                            Semantics.Base(ns) -> str ^ NodeSet.to_string ns ^ ","
+                          | Semantics.Fun(map) -> str ^ "HO" ^ "," ) 
+          sems "[") ^ "]"
+end

@@ -1,20 +1,20 @@
 exception Err of string
 
 type lvl =
-  | All
+  | Debug
   | Detailed
   | Info
   | None
 
 let (>=) = function
-  | All -> (function
-            | All -> false
+  | Debug -> (function
+            | Debug -> true
             | _ -> false)
   | Detailed -> (function
-            | All | Detailed -> true
+            | Debug | Detailed -> true
             | _ -> false)
   | Info -> (function
-            | All | Detailed | Info -> true
+            | Debug | Detailed | Info -> true
             | _ -> false)
   | None -> function | _ -> true
 

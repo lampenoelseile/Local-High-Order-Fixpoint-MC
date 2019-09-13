@@ -1,6 +1,6 @@
 exception Err of string
 
-type lvl = All | Detailed | Info | None
+type lvl = Debug | Detailed | Info | None
 
 val ( >= ) : lvl -> lvl -> bool
 
