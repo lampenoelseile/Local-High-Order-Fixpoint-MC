@@ -48,6 +48,7 @@ module Semantics : sig
     | Base of NodeSet.t
     | Fun of (t,t) TreeMap.t
 
+  val compare : t -> t -> int
   val empty_base : t
   val empty_fun : t
 
@@ -85,6 +86,6 @@ module SemanticsSet : sig
    val iter : (Semantics.t -> unit) -> t -> unit
    val fold : (Semantics.t -> 'a -> 'a) -> t -> 'a -> 'a
 
-   val all_of_type : Lts.t -> Formula.variable_t -> t
+   val all_of_type : ?v_lvl:Verbose.lvl -> Lts.t -> Formula.variable_t -> t
    val to_string : t -> string
 end

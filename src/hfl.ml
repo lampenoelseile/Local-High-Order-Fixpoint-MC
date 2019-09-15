@@ -3,7 +3,6 @@ open Datastructures
 open Tcsset
 module V = Verbose
 
-(* TODO: check whats needed and comment remaining.*)
 module Formula = struct
   type variable_t = 
   | Base
@@ -64,13 +63,36 @@ module Semantics = struct
     | Base of NodeSet.t
     | Fun of (t,t) TreeMap.t
   
-  let empty_base = Base(NodeSet.empty)
-  let empty_fun = Fun(TreeMap.empty compare)
-
   let rec to_string sem = 
     match sem with
     | Base(ns) -> NodeSet.to_string ns
-    | Fun(map) -> (TreeMap.fold (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") map "[") ^ "]"
+    | Fun(map) -> (TreeMap.fold (fun key value str -> str ^ "[ARG:" ^ to_string key ^ "->VAL:" ^ to_string value ^ "],") map "[") ^ "]"
+  
+  let rec compare = function
+    Base ns_one ->  (function
+                  Base ns_two -> NodeSet.compare ns_one ns_two
+                  | Fun map -> V.console_out V.Debug V.Debug(fun () -> "Tried to compare nodeset against map."); assert false)
+    | Fun map_one -> (function
+                      Base ns_two -> V.console_out V.Debug V.Debug (fun () -> "Tried to compare map against nodeset."); assert false
+                      | Fun map_two -> 
+                                if (TreeMap.fold 
+                                        (fun key_one value_one fold_one -> 
+                                            fold_one + TreeMap.fold 
+                                              (fun key_two value_two fold_two -> 
+                                                let value = if (compare key_one key_two ) == 0 && (compare value_one value_two) == 0 then 0 else 1 in
+                                                fold_two * value) 
+                                              map_two 1) 
+                                          map_one 0) == 0  && (TreeMap.fold 
+                                        (fun key_one value_one fold_one -> 
+                                            fold_one + TreeMap.fold 
+                                              (fun key_two value_two fold_two -> 
+                                                let value = if (compare key_one key_two ) == 0 && (compare value_one value_two) == 0 then 0 else 1 in
+                                                fold_two * value) 
+                                              map_one 1) 
+                                          map_two 0) == 0  then 0 else 1) (*TODO: W T F *)
+
+  let empty_base = Base(NodeSet.empty)
+  let empty_fun = Fun(TreeMap.empty compare)
 
   (*TODO: Make output compact, add module etc*)
   let rec is_defined_for_args ?(v_lvl=V.None) = function
@@ -104,7 +126,7 @@ module Semantics = struct
     | Fun(map) ->  (function
                     | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was not of type Base but arglist empty: " ^ to_string (Fun map)); 
                             assert false
-                    | h :: [] -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set for arg -> ns object.");
+                    | h :: [] -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set to" ^ to_string value);
                                   Fun(TreeMap.add h value map);
                     | h :: t -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set for fun object.");
                                 if is_defined_for_args ~v_lvl (Fun map) [h] then
@@ -112,24 +134,41 @@ module Semantics = struct
                                 else
                                   let new_map = empty_fun in 
                                   Fun(TreeMap.add h (set_value_for_args ~v_lvl value new_map t) map))
+  
+  let rec from_list_of_pairs = function
+    [] -> empty_fun
+    | h :: t -> let (arg,value) = h in set_value_for_args value (from_list_of_pairs t) [arg]
+
 end
 
 (*SET OF SEMANTICS *)
 module SemanticsSet = struct
   type t = Semantics.t TreeSet.t
 
-  let empty = TreeSet.empty compare
+  let empty = TreeSet.empty Semantics.compare
   let add = TreeSet.add
   let iter = TreeSet.iter
   let fold = TreeSet.fold
-
-  let rec all_of_type lts = function
-      Formula.Base -> NodeSet.fold_subsets (fun ns sems -> add (Semantics.Base ns) sems) (Lts.get_all_nodes lts) empty
-    | Formula.Fun(key_t, val_t) -> empty
+  let union = TreeSet.union
+  let elements = TreeSet.elements
 
   let to_string sems =
     (fold (fun sem str -> match sem with
-                            Semantics.Base(ns) -> str ^ NodeSet.to_string ns ^ ","
-                          | Semantics.Fun(map) -> str ^ "HO" ^ "," ) 
+                            Semantics.Base(ns) -> str ^ Semantics.to_string (Base ns)^ ","
+                          | Semantics.Fun(map) -> str ^ Semantics.to_string (Fun map)^ "," ) 
           sems "[") ^ "]"
+  
+    let rec all_of_type ?(v_lvl=V.None) lts = function
+      Formula.Base -> NodeSet.fold_subsets (fun ns sems -> add (Semantics.Base ns) sems) (Lts.get_all_nodes lts) empty
+    | Formula.Fun(arg_t, val_t) -> let all_arguments = all_of_type lts arg_t in
+                                   let all_values = all_of_type lts val_t in
+                                   V.console_out V.Debug v_lvl (fun () -> "Arguments: " ^ to_string all_arguments);
+                                   V.console_out V.Debug v_lvl (fun () -> "Values: " ^ to_string all_values);
+                                   let rec helper arguments values pairs =
+                                    match arguments with
+                                      | [] -> empty
+                                      | h :: [] -> List.fold_left (fun val_sems value -> add (Semantics.from_list_of_pairs ((h,value)::pairs)) val_sems) empty values
+                                      | h :: t -> List.fold_left (fun val_sems value -> union val_sems (helper t values ((h, value) :: pairs))) empty values
+                                   in
+                                   helper (elements all_arguments) (elements all_values) []
 end

@@ -114,12 +114,13 @@ and fully_calc_sem lts formula args env v_lvl =
                                                                           all_args (S.empty_fun) 
   | F.Var(var,var_t) -> if VarMap.mem (Var(var,var_t)) env then begin
                           V.console_out V.Debug v_lvl (fun () -> "Variable " ^ var ^ " exists in env map."); 
-                          VarMap.get (Var(var,var_t)) env
+                          VarMap.get (Var(var,var_t)) env       (*TODO: THIS DOES NOT WORK. ARGUMENT 0 is not value*)
                         end 
                         else begin
-                          let value = List.nth args 0 in
+                          let argument = List.nth args 0 in
+                          let func = List.nth args 1 in
                           V.console_out V.Debug v_lvl (fun () -> "Variable " ^ var ^ " does not exist in env map.");
-                          value
+                          Semantics.get_value_for_args func [argument]
                         end
   | F.App(phi_1,phi_2) -> helper lts phi_1 ((helper lts phi_2 [] env v_lvl) :: args) env v_lvl
   | _ -> S.Base(model_check lts formula [] env V.None) in 
@@ -127,6 +128,9 @@ and fully_calc_sem lts formula args env v_lvl =
   let value = helper lts formula args env v_lvl in
   V.console_out V.Detailed v_lvl (fun () -> "Result: " ^ S.to_string value);
   value
+
+let fully_calc_sem ?(verb_lvl=V.Debug) lts formula =
+  fully_calc_sem lts formula [] VarMap.empty verb_lvl
 
 let model_check ?(verb_lvl=V.Info) lts formula =
   V.console_out V.Info verb_lvl (fun () -> "MODEL CHECKER INPUT:");

@@ -21,6 +21,8 @@ module NodeSet : sig
       @return if nodeset is empty
    *)
 
+   val compare : t -> t -> int
+   
    val elem    : node -> t -> bool
    (** Checks if the given node is a member of the given nodeset.
       @param node node to be checked
