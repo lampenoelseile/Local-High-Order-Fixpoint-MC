@@ -6,39 +6,41 @@ open Hfl
 module V = Verbose
 open Tcsset
 
-module type VarMapInt = sig
-  (*interface: VarMap module. 
-    Represents mapping from a Variable (see formula.t)
+
+module VarMap  = struct
+  (*Variable map. Simple map, which pairs variable with its current semantic value. 
+    Based on TreeMap. (SEE TCSLib)
   *)
-  type t
-
-  val empty : t
-  val set : F.t -> S.t -> t -> t
-  val get : F.t -> t -> S.t
-  val mem : F.t -> t -> bool
-end
-
-module VarMap : VarMapInt = struct
-
   type t = (F.t, S.t) TreeMap.t
-
+    (* varmap type. (key:variable, value: semantic object) *)
   let empty = TreeMap.empty compare
-
-  let set variable value map = 
-    match variable with
-      F.Var(var_name,var_t) -> (*TODO: Add typecheck.*) TreeMap.add variable value map
-    | _ -> print_endline "Error. Given Key is not a variable."; map
-  
-  let get variable map =
-    if TreeMap.mem variable map then
-      TreeMap.find variable map
-    else
-      assert false
-
+    (* creates empty treemap *)
   let mem = TreeMap.mem
+    (*check if variable is defined in mem *)
+  let set ?(v_lvl=V.None) argument value map = 
+    (* sets / initializes value for given argument*)
+    match argument with
+      F.Var(var_name,var_t) ->  TreeMap.add argument value map  (*TODO: Add typecheck between var_t and value *)
+    | _ ->  Verbose.console_out V.Debug v_lvl 
+              (fun () -> "VarMap argument was not of type Var(...)"); assert false 
+  let get ?(v_lvl=V.None) argument map =
+    (* gets current value for given argument. safetychecks included*)
+    match argument with
+      F.Var(var_name,var_t) ->  if mem argument map then
+                                  TreeMap.find argument map
+                                else
+                                begin
+                                  Verbose.console_out V.Debug v_lvl 
+                                    (fun () -> "VarMap argument was undefined, but value was asked for");
+                                  assert false
+                                end
+    | _ ->  Verbose.console_out V.Debug v_lvl 
+              (fun () -> "VarMap argument was not of type Var(...)"); 
+            assert false
 end
 
 let rec model_check lts formula args env v_lvl =
+
   V.console_out V.Detailed v_lvl (fun () -> "Step: " ^ F.to_string formula);
   match formula with
     F.Const(b) -> if b then begin 
@@ -49,9 +51,11 @@ let rec model_check lts formula args env v_lvl =
                     V.console_out V.Detailed v_lvl (fun () -> " Case: Bot - Value: []");
                     NodeSet.empty
                   end
+
   | F.Prop(prop) -> let value = Lts.get_nodes_of_proposition lts prop in 
                     V.console_out V.Detailed v_lvl (fun () -> " Case: Prop " ^ prop ^ " - Value: " ^ NodeSet.to_string value);
                     value
+                    
   | F.Var(var,var_t) -> let current_val = (VarMap.get (F.Var(var, var_t)) env) in
                         if S.is_defined_for_args ~v_lvl current_val args then 
                           (match S.get_value_for_args current_val args with
@@ -59,30 +63,36 @@ let rec model_check lts formula args env v_lvl =
                             | S.Fun(map) -> print_endline "Error: Case Var returned fun."; NodeSet.empty)
                         else
                         NodeSet.empty
+
   | F.Neg(phi) -> let value = NodeSet.diff (Lts.get_all_nodes lts) (model_check lts phi args env v_lvl) in
                   V.console_out V.Detailed v_lvl (fun () -> " Case: Negation of " ^ F.to_string phi ^ " - Value: " ^ NodeSet.to_string value);
                   value
+
   | F.Conj(phi_1, phi_2) -> let value = NodeSet.inter (model_check lts phi_1 args env v_lvl) (model_check lts phi_2 args env v_lvl) in
                             V.console_out V.Detailed v_lvl (fun () -> " Case: Conj of " 
                                                                         ^ F.to_string phi_1 ^ " and " ^ F.to_string phi_2 
                                                                         ^ " - Value: " ^ NodeSet.to_string value);
                             value
+
   | F.Disj(phi_1, phi_2) -> let value = NodeSet.union (model_check lts phi_1 args env v_lvl) (model_check lts phi_2 args env v_lvl) in
                             V.console_out V.Detailed v_lvl (fun () -> " Case: Disj of " 
                                                                         ^ F.to_string phi_1 ^ " and " ^ F.to_string phi_2 
                                                                         ^ " - Value: " ^ NodeSet.to_string value);
                             value
+
   | F.Impl(phi_1, phi_2) -> let value = NodeSet.union (model_check lts (F.Neg(phi_1)) args env v_lvl) (model_check lts phi_2 args env v_lvl) in 
                             V.console_out V.Detailed v_lvl (fun () -> " Case: Impl of " 
                                                                         ^ F.to_string phi_1 ^ " and " ^ F.to_string phi_2 
                                                                         ^ " - Value: " ^ NodeSet.to_string value);
                             value
+
   | F.Equiv(phi_1, phi_2) ->  let value = NodeSet.inter (model_check lts (F.Impl(phi_1,phi_2)) args env v_lvl) 
                                                         (model_check lts (F.Impl(phi_2,phi_1)) args env v_lvl) in 
                               V.console_out V.Detailed v_lvl (fun () -> " Case: Equiv of " 
                                                                         ^ F.to_string phi_1 ^ " and " ^ F.to_string phi_2 
                                                                         ^ " - Value: " ^ NodeSet.to_string value);
                               value
+
   | F.Diamond(trans, phi) ->  let val_diamond_phi = ref NodeSet.empty in
                               let val_phi = model_check lts phi args env v_lvl in 
                               NodeSet.iter (fun n -> 
@@ -91,14 +101,19 @@ let rec model_check lts formula args env v_lvl =
                                               val_phi;
                               V.console_out V.Detailed v_lvl (fun () -> " Case: Diamond of " ^ F.to_string phi ^ " - Value: " ^ NodeSet.to_string !val_diamond_phi);
                               !val_diamond_phi 
+
   | F.Box(transition, phi) -> let value = model_check lts (F.Neg(F.Diamond(transition, F.Neg(phi)))) args env v_lvl in 
                               V.console_out V.Detailed v_lvl (fun () -> " Case: Box of " ^ F.to_string phi ^ " - Value: " ^ NodeSet.to_string value);
                               value
-  | F.Mu(var,var_t,phi) -> NodeSet.empty 
-  | F.Nu(var,var_t,phi) -> NodeSet.empty
+
+  | F.Mu(var,var_t,phi) -> NodeSet.empty (*TODO*)
+
+  | F.Nu(var,var_t,phi) -> NodeSet.empty (*TODO*)
+
   | F.Lambda(var,var_t,phi) ->  let value = model_check lts phi (List.tl args) (VarMap.set (F.Var (var,var_t)) (List.nth args 0) env) v_lvl in 
                                 V.console_out V.Detailed v_lvl (fun () -> " Case: Lambda " ^ var ^ " of " ^ F.to_string phi ^ " - Value: " ^ NodeSet.to_string value);
                                 value
+
   | F.App(phi_1, phi_2) ->  let phi_2_sem = fully_calc_sem lts phi_2 [] env v_lvl in 
                             let value = model_check lts phi_1 (phi_2_sem :: args) env v_lvl in
                             V.console_out V.Detailed v_lvl (fun () -> " Case: App of " ^ F.to_string phi_2 ^ 
@@ -112,13 +127,13 @@ and fully_calc_sem lts formula args env v_lvl =
                                                         V.console_out V.Debug v_lvl (fun () -> "  Arguments: " ^ SemanticsSet.to_string all_args);
                                                         SemanticsSet.fold (fun arg sem -> S.set_value_for_args ~v_lvl (helper lts phi (arg :: args) env v_lvl) sem [arg]) 
                                                                           all_args (S.empty_fun) 
-  | F.Var(var,var_t) -> if VarMap.mem (Var(var,var_t)) env then begin
+  | F.Var(var,var_t) -> if VarMap.mem (F.Var(var,var_t)) env then begin
                           V.console_out V.Debug v_lvl (fun () -> "Variable " ^ var ^ " exists in env map."); 
-                          VarMap.get (Var(var,var_t)) env       (*TODO: THIS DOES NOT WORK. ARGUMENT 0 is not value*)
+                          VarMap.get (F.Var(var,var_t)) env 
                         end 
                         else begin
                           let argument = List.nth args 0 in
-                          let func = List.nth args 1 in
+                          let func = List.nth args 1 in (* SHORTLY HACKED *)
                           V.console_out V.Debug v_lvl (fun () -> "Variable " ^ var ^ " does not exist in env map.");
                           Semantics.get_value_for_args func [argument]
                         end
