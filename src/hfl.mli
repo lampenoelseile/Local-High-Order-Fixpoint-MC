@@ -1,6 +1,5 @@
 open Datastructures
 open Tcsset
-open Verbose
 
 module Formula : sig
   type variable_t =
@@ -57,7 +56,7 @@ module Semantics : sig
       @param t semantic object
       @return string representation
   *)
-  val is_defined_for_args : ?v_lvl:Verbose.lvl -> t -> t list -> bool
+  val is_defined_for_args : t -> t list -> bool
   (** Checks wether value of a semantic object is defined for given arguments.
       @param t semantic object 
       @param t list arguments
@@ -69,7 +68,7 @@ module Semantics : sig
       @param t list arguments
       @return value for given arguments
   *)
-  val set_value_for_args : ?v_lvl:Verbose.lvl -> t -> t -> t list -> t
+  val set_value_for_args : t -> t -> t list -> t
   (** Sets value of semantic object for given arguments. 
       @param t value to be set
       @param t semantic object 
@@ -86,6 +85,6 @@ module SemanticsSet : sig
    val iter : (Semantics.t -> unit) -> t -> unit
    val fold : (Semantics.t -> 'a -> 'a) -> t -> 'a -> 'a
 
-   val all_of_type : ?v_lvl:Verbose.lvl -> Lts.t -> Formula.variable_t -> t
+   val all_of_type : Lts.t -> Formula.variable_t -> t
    val to_string : t -> string
 end

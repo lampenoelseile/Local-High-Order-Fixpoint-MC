@@ -1,7 +1,6 @@
 (* For high-level info about public parts see formulas.mli *)
 open Datastructures
 open Tcsset
-module V = Verbose
 
 module Formula = struct
   type variable_t = 
@@ -66,14 +65,14 @@ module Semantics = struct
   let rec to_string sem = 
     match sem with
     | Base(ns) -> NodeSet.to_string ns
-    | Fun(map) -> (TreeMap.fold (fun key value str -> str ^ "[ARG:" ^ to_string key ^ "->VAL:" ^ to_string value ^ "],") map "[") ^ "]"
+    | Fun(map) -> (TreeMap.fold (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") map "[") ^ "]"
   
   let rec compare = function
     Base ns_one ->  (function
                   Base ns_two -> NodeSet.compare ns_one ns_two
-                  | Fun map -> V.console_out V.Debug V.Debug(fun () -> "Tried to compare nodeset against map."); assert false)
+                  | Fun map -> assert false)
     | Fun map_one -> (function
-                      Base ns_two -> V.console_out V.Debug V.Debug (fun () -> "Tried to compare map against nodeset."); assert false
+                      Base ns_two -> assert false
                       | Fun map_two -> 
                                 if (TreeMap.fold 
                                         (fun key_one value_one fold_one -> 
@@ -95,18 +94,14 @@ module Semantics = struct
   let empty_fun = Fun(TreeMap.empty compare)
 
   (*TODO: Make output compact, add module etc*)
-  let rec is_defined_for_args ?(v_lvl=V.None) = function
+  let rec is_defined_for_args = function
     | Base(ns) -> (function
-                  | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was of type Base and arglist empty: " ^ to_string (Base ns)); true
-                  | _ ->  V.console_out V.Debug v_lvl (fun () -> "Object was of type Base but arglist nonempty - Obj:" ^ to_string (Base ns)); 
-                          assert false)
+                  | [] -> true
+                  | _ ->  assert false)
     | Fun(map) -> (function
-                  | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was not of type Base but arglist empty: " ^ to_string (Fun map));  
-                          assert false
+                  | [] -> assert false
                   | h :: t ->  let value = TreeMap.mem h map in
-                                V.console_out V.Debug v_lvl (fun () -> "Definition of sem for " ^ to_string (Fun map) 
-                                                                        ^ " for "^ to_string h ^ " is "^ Bool.to_string value);
-                                value && is_defined_for_args ~v_lvl (TreeMap.find h map) t)
+                                value && is_defined_for_args (TreeMap.find h map) t)
 
   let rec get_value_for_args = function
     | Base(ns) -> (function
@@ -117,23 +112,18 @@ module Semantics = struct
                   | h :: t -> get_value_for_args (TreeMap.find h map) t)
   
   (*TODO: Make verbose compact, add module etc*)
-  let rec set_value_for_args ?(v_lvl=V.None) value = function
+  let rec set_value_for_args value = function
     | Base(ns) -> (function
-                    | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was of type Base and arglist empty: " ^ to_string (Base ns));
-                            value
-                    | _ ->  V.console_out V.Debug v_lvl (fun () -> "Object was of type Base but arglist nonempty: " ^ to_string (Base ns)); 
-                            assert false)
+                    | [] -> value
+                    | _ ->  assert false)
     | Fun(map) ->  (function
-                    | [] -> V.console_out V.Debug v_lvl (fun () -> "Object was not of type Base but arglist empty: " ^ to_string (Fun map)); 
-                            assert false
-                    | h :: [] -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set to" ^ to_string value);
-                                  Fun(TreeMap.add h value map);
-                    | h :: t -> V.console_out V.Debug v_lvl (fun () -> "Argument " ^ to_string h ^ " is set for fun object.");
-                                if is_defined_for_args ~v_lvl (Fun map) [h] then
-                                  Fun(TreeMap.add h (set_value_for_args ~v_lvl value (TreeMap.find h map) t) map)
+                    | [] ->  assert false
+                    | h :: [] -> Fun(TreeMap.add h value map);
+                    | h :: t -> if is_defined_for_args (Fun map) [h] then
+                                  Fun(TreeMap.add h (set_value_for_args value (TreeMap.find h map) t) map)
                                 else
                                   let new_map = empty_fun in 
-                                  Fun(TreeMap.add h (set_value_for_args ~v_lvl value new_map t) map))
+                                  Fun(TreeMap.add h (set_value_for_args value new_map t) map))
   
   let rec from_list_of_pairs = function
     [] -> empty_fun
@@ -158,17 +148,15 @@ module SemanticsSet = struct
                           | Semantics.Fun(map) -> str ^ Semantics.to_string (Fun map)^ "," ) 
           sems "[") ^ "]"
   
-    let rec all_of_type ?(v_lvl=V.None) lts = function
+    let rec all_of_type lts = function
       Formula.Base -> NodeSet.fold_subsets (fun ns sems -> add (Semantics.Base ns) sems) (Lts.get_all_nodes lts) empty
     | Formula.Fun(arg_t, val_t) -> let all_arguments = all_of_type lts arg_t in
                                    let all_values = all_of_type lts val_t in
-                                   V.console_out V.Debug v_lvl (fun () -> "Arguments: " ^ to_string all_arguments);
-                                   V.console_out V.Debug v_lvl (fun () -> "Values: " ^ to_string all_values);
                                    let rec helper arguments values pairs =
                                     match arguments with
                                       | [] -> empty
                                       | h :: [] -> List.fold_left (fun val_sems value -> add (Semantics.from_list_of_pairs ((h,value)::pairs)) val_sems) empty values
                                       | h :: t -> List.fold_left (fun val_sems value -> union val_sems (helper t values ((h, value) :: pairs))) empty values
                                    in
-                                   helper (elements all_arguments) (elements all_values) []
+                                   helper (elements all_arguments) (elements all_values) [] (* TODO explain *)
 end
