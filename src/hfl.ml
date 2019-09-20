@@ -55,6 +55,27 @@ module Formula = struct
     Format.sprintf "%s %s" (f_app phi) (f psi)
       | _ as phi -> f phi
     in f phi
+
+    let rec nu_to_mu f = 
+      let rec helper var = function
+          Const(b) -> Const b
+        | Prop(prop_var) -> Prop prop_var
+        | Var(varr,t) -> if var == varr then Neg (Var (varr,t)) else Var(varr,t)
+        | Neg(phi) -> Neg (helper var phi)
+        | Conj(phi1, phi2) -> Conj((helper var phi1),(helper var phi2))
+        | Disj(phi1, phi2) -> Disj((helper var phi1),(helper var phi2)) 
+        | Impl(phi1, phi2) -> Impl((helper var phi1),(helper  var phi2))
+        | Equiv(phi1, phi2) -> Equiv((helper var phi1),(helper var phi2))
+        | Diamond(action, phi) -> Diamond(action, helper var phi)
+        | Box(action, phi) -> Box(action, helper var phi) 
+        | Mu(varr,t,phi) -> Mu(varr,t,helper var phi)
+        | Nu(varr,t,phi) -> Nu(varr,t,helper var phi)
+        | Lambda(varr,t,phi) -> Lambda(varr,t,helper var phi)
+        | App(phi,psi) -> App(helper var phi, helper var psi)
+      in
+      match f with
+       Nu(var, t, phi) -> Neg (Mu(var,t, helper var phi))
+      | _ -> assert false
 end
   
 module Semantics = struct
@@ -88,7 +109,7 @@ module Semantics = struct
                                                 let value = if (compare key_one key_two ) == 0 && (compare value_one value_two) == 0 then 0 else 1 in
                                                 fold_two * value) 
                                               map_one 1) 
-                                          map_two 0) == 0  then 0 else 1) (*TODO: W T F *)
+                                          map_two 0) == 0  then 0 else 1) (*TODO: W T F. Thats a weird compare (partial)*)
 
   let empty_base = Base(NodeSet.empty)
   let empty_fun = Fun(TreeMap.empty compare)
@@ -128,6 +149,17 @@ module Semantics = struct
   let rec from_list_of_pairs = function
     [] -> empty_fun
     | h :: t -> let (arg,value) = h in set_value_for_args value (from_list_of_pairs t) [arg]
+  
+    let rec get_defined_arguments = function
+    Base(ns) -> [[]]
+  | Fun(map) -> if TreeMap.is_empty map then []
+                else(
+                  let args = Tcsbasedata.Iterators.to_list 
+                              (TreeMap.to_key_iterator map) 
+                  in
+                  List.fold_left (fun list arg ->
+                                    (List.map (fun arg_list -> arg :: arg_list) (get_defined_arguments (get_value_for_args (Fun map) [arg]))) @ list) 
+                    [] args)
 
 end
 

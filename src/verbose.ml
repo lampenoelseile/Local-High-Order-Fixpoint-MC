@@ -45,13 +45,13 @@ let sem_log_out ?(folderpath="./outputs/") global_lvl message_lvl sem form =
                                                                     str ^ " [arg" ^ (string_of_int (!arg_replace-1)) ^ "->" ^ S.to_string value ^ "]\n"
                                         | S.Base(ns), S.Fun(map) -> helper value path (filename ^ "_value" ^ (string_of_int !value_replace));
                                                                     value_replace := !value_replace + 1;
-                                                                    str ^ " [" ^ S.to_string key ^ "->" ^ (string_of_int (!value_replace-1)) ^ "]\n"
+                                                                    str ^ " [" ^ S.to_string key ^ "->val" ^ (string_of_int (!value_replace-1)) ^ "]\n"
                                         | S.Fun(key_map), S.Fun(value_map) -> helper key path (filename ^ "_arg" ^ (string_of_int !arg_replace));
                                                                               arg_replace := !arg_replace + 1;
                                                                               helper value path (filename ^ "_value" ^ (string_of_int !value_replace));
                                                                               value_replace := !value_replace + 1;
-                                                                              str ^ " [" ^ (string_of_int (!arg_replace-1)) 
-                                                                              ^ "->" ^ (string_of_int (!value_replace-1)) ^ "]\n"
+                                                                              str ^ " [arg" ^ (string_of_int (!arg_replace-1)) 
+                                                                              ^ "->val" ^ (string_of_int (!value_replace-1)) ^ "]\n"
                                       ) map "[\n") ^ "]"
                         in
                         let oc = open_out (folderpath ^ filename ^ ".log") in

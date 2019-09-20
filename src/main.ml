@@ -5,13 +5,15 @@ open Mc
 
 let _ =
   let open Formula in
-  let f' = App(Lambda("X", Fun(Base, Base), Equiv( App(Var("X", Fun(Base, Base)), Prop("p")), Const(false))), Lambda("Y", Base, Var("Y", Base))) in
+  let f' = App(Mu("X", Fun(Base,Base), Lambda("x",Base, Disj(Var("x",Base), App(Var("X",Fun(Base,Base)),Diamond("a", Var("x",Base)))))), Prop("p")) in
   let f = Lambda("Y", Fun(Base,Base), App(Var("Y", Fun(Base,Base)), Prop("p"))) in
-  let lts = Lts.create_random 1 ["a"; "b"; "c"] ["p"; "q"; "r"; "s"] 0.5 0.8 in
-  (*model_check ~verb_lvl:Verbose.Debug lts f';*)
-  let map_one = ref (fully_calc_sem ~v_lvl:Verbose.Debug f' lts ) in 
+  let f'' = Lambda("Z", (Fun(Base,Base)), Var("Z", Fun(Base,Base))) in
+  let lts = Lts.create_random 10 ["a"] ["p"] 0.1 0.2 in
+  (*print_endline (Formula.to_string f')*)
+  model_check ~v_lvl:Verbose.Detailed f' lts;
+  (*let map_one = ref (fully_calc_sem ~v_lvl:Verbose.Debug f'' lts) in 
   let map_two = map_one in
-  ()
+  ()*)
   (*map_one := Semantics.set_value_for_args (Semantics.Base(NodeSet.of_node_list [0;2])) !map_one [(Semantics.Base(NodeSet.of_node_list [0;2]))];
   map_two := Semantics.Base NodeSet.empty;
   print_endline (Formula.to_string f);

@@ -154,7 +154,7 @@ let create_random node_count trans_as_string_list props_as_string_list edge_load
 let get_all_nodes lts =
   lts.nodes
 let get_trans_predecessors_of_node lts trans node =
-  TransitionMap.get_tsuccessors_of_node lts.transitions trans node
+  TransitionMap.get_tpredecessors_of_node lts.transitions trans node
 
 let get_trans_successors_of_node lts trans node =
   TransitionMap.get_tsuccessors_of_node lts.transitions trans node

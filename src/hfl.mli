@@ -33,6 +33,8 @@ module Formula : sig
       @param formula formula to be converted
       @return string  string representation of formula
   *)
+
+  val nu_to_mu : t -> t
 end
 
 module Semantics : sig
@@ -75,6 +77,7 @@ module Semantics : sig
       @param t list arguments
       @return value for given arguments
   *)
+  val get_defined_arguments : t -> (t list) list
 end
 
 module SemanticsSet : sig 
