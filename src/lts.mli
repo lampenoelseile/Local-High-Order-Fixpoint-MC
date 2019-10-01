@@ -4,10 +4,14 @@ open Datastructures
 (** LTS type *)
 type t
 
+val create_empty : t 
+(** Creates empty LTS.
+    @return empty lts
+*)
 val create_dummy  : int -> t
-(** Creates LTS without any nodes or valid propositions.
+(** Creates LTS without any transitions or valid propositions.
     @param int lts size
-    @return plain lts
+    @return lts with dummy nodes
 *)
 
 val create_random : int -> string list -> string list -> float -> float -> t
@@ -19,9 +23,21 @@ val create_random : int -> string list -> string list -> float -> float -> t
     @param float percentage of propositions to be set randomly
     @return randomly-generated lts
 *)
+val create_dummy_from_nodeset : NodeSet.t -> t
+(** Creates LTS without any transitions or valid propositions,
+    but specified nodes.
+    @param nodeset nodes to create lts from
+    @return dummy lts with nodes from nodeset
+*)
 
-(* we'll see later if needed :
-val add_transition : t -> string -> node -> node -> t
+val add_node : t -> Node.t -> t
+(** Adds new node to LTS.
+    @param t LTS
+    @param node node to add
+    @return LTS with added node
+*)
+
+val add_transition : t -> string -> Node.t -> Node.t -> t
 (** Adds new edge to LTS.
     @param t LTS
     @param string transition
@@ -30,20 +46,20 @@ val add_transition : t -> string -> node -> node -> t
     @return LTS with added edge
 *)
 
-val add_proposition : t -> node -> string -> t
+val add_proposition : t -> Node.t -> string -> t
 (** Adds new propsitions to node of given lts.
     @param t LTS   
     @param node 
     @param string proposition to be added
     @return LTS with updated propset of node
-*) *)
+*)
 
 val get_all_nodes : t -> NodeSet.t
 (**  Returns complete nodeset of lts.
      @param t LTS
      @return nodeset
 *)
-val get_trans_predecessors_of_node : t -> string -> node -> NodeSet.t
+val get_trans_predecessors_of_node : t -> string -> Node.t -> NodeSet.t
 (** Returns predecessors of given node.
     @param t LTS
     @param string transition
@@ -51,7 +67,7 @@ val get_trans_predecessors_of_node : t -> string -> node -> NodeSet.t
     @return predecessors nodeset
 *)
 
-val get_trans_successors_of_node : t -> string -> node -> NodeSet.t
+val get_trans_successors_of_node : t -> string -> Node.t -> NodeSet.t
 (** Returns successors of given node.
     @param t LTS
     @param string transition

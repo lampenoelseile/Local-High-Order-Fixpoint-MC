@@ -18,7 +18,7 @@ module TransitionMap = struct
   (* node map. key: int/node value: set of nodes. 
      here used as value in transition map some node (key) to some kind of predecessors or successors (value).
   *)
-    type t = (node, NodeSet.t) TreeMap.t
+    type t = (Node.t, NodeSet.t) TreeMap.t
 
     let empty = TreeMap.empty compare
     
@@ -103,8 +103,17 @@ end
 
 type t = {nodes : NodeSet.t; propositions : PropMap.t; transitions : TransitionMap.t}
 
+let create_empty = 
+  {nodes = NodeSet.empty; propositions = PropMap.empty; transitions = TransitionMap.empty}
+
 let create_dummy node_count = 
   {nodes = NodeSet.init node_count; propositions = PropMap.empty; transitions = TransitionMap.empty}
+
+let create_dummy_from_nodeset nodeset =
+  {nodes = nodeset; propositions = PropMap.empty; transitions = TransitionMap.empty}
+
+let add_node lts node =
+  {nodes = NodeSet.add node lts.nodes; propositions = lts.propositions; transitions = lts.transitions}
 
 let add_transition lts transition from_node to_node =
   {nodes = lts.nodes; propositions = lts.propositions; transitions = TransitionMap.set_transition lts.transitions transition from_node to_node}
@@ -165,13 +174,13 @@ let get_nodes_of_proposition lts prop =
 let to_string lts =
   let string_rep = ref "" in
   let active_tkeys = TransitionMap.get_keys_as_list lts.transitions in
-  string_rep := "node (trans [pred] [succ])* props:";
+  string_rep := "NODE (TRANSITION [PREDECESSORS] [SUCCESSORS])* PROPS";
   NodeSet.iter (fun n -> 
-                  let str = ref (string_of_int n) in 
+                  let str = ref (Node.to_string n) in 
                   List.iter (fun t  ->
                               let tpred_str = NodeSet.to_string (TransitionMap.get_tpredecessors_of_node lts.transitions t n) in
                               let tsucc_str = NodeSet.to_string (TransitionMap.get_tsuccessors_of_node lts.transitions t n) in 
-                              str := "  " ^ !str ^ " " ^ t ^ "-trans " ^ tpred_str ^ " " ^ tsucc_str) active_tkeys; 
-                  str := !str ^ " props: " ^ (PropSet.to_string (PropMap.get_props_of_node lts.propositions n)); 
+                              str := !str ^ " " ^ t ^ "-trans " ^ tpred_str ^ " " ^ tsucc_str) active_tkeys; 
+                  str := !str ^ " props " ^ (PropSet.to_string (PropMap.get_props_of_node lts.propositions n)); 
                   string_rep := String.concat "\n" [!string_rep;!str]) lts.nodes;
   !string_rep

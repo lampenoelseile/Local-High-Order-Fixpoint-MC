@@ -114,7 +114,6 @@ module Semantics = struct
   let empty_base = Base(NodeSet.empty)
   let empty_fun = Fun(TreeMap.empty compare)
 
-  (*TODO: Make output compact, add module etc*)
   let rec is_defined_for_args = function
     | Base(ns) -> (function
                   | [] -> true
@@ -132,7 +131,6 @@ module Semantics = struct
                   | [] -> print_endline "Error."; Fun(map)
                   | h :: t -> get_value_for_args (TreeMap.find h map) t)
   
-  (*TODO: Make verbose compact, add module etc*)
   let rec set_value_for_args value = function
     | Base(ns) -> (function
                     | [] -> value
