@@ -3,16 +3,34 @@ open Tcsbasedata
 open Tcsset
 
 (* NODE *)
-type node = int
-let node_to_string = string_of_int
+module Node = struct
+  type t =
+  | SimpleNode of int
+  | NamedNode of string
+
+  let to_string = function
+  SimpleNode i -> string_of_int i
+  | NamedNode s -> s
+
+  let compare = function
+  SimpleNode i -> (function
+              SimpleNode j -> Int.compare i j
+            | NamedNode t -> assert false)
+  | NamedNode s -> (function
+                      SimpleNode j -> assert false
+                    | NamedNode t -> String.compare s t)
+end 
+
+
+
 
 (* NODESET *)
 module NodeSet = struct
-  type t = node TreeSet.t
+  type t = Node.t TreeSet.t
 
   let isEmpty = TreeSet.is_empty
   let compare = TreeSet.compare
-  let empty = TreeSet.empty Int.compare
+  let empty = TreeSet.empty Node.compare
   let elem = TreeSet.mem
   let fold f acc ns = TreeSet.fold (fun x y -> f y x) ns acc
   let iter = TreeSet.iter
@@ -29,7 +47,7 @@ module NodeSet = struct
   let union = TreeSet.union
   let inter = TreeSet.inter
   let diff = TreeSet.diff
-  let of_node_list = TreeSet.of_list Int.compare
+  let of_node_list = TreeSet.of_list Node.compare
   let as_node_list = TreeSet.elements
   let fold_subsets = TreeSet.fold_subsets
 
@@ -46,12 +64,12 @@ module NodeSet = struct
 
   let max ns lessf = fold (fun v -> fun w -> if lessf v w then w else v) (some ns) ns
 
-  let to_string ns = "["^(String.concat "," (List.map node_to_string (as_node_list ns)))^"]"
+  let to_string ns = "["^(String.concat "," (List.map Node.to_string (as_node_list ns)))^"]"
 
   let init =
     let rec f ns = function
-      | 0 -> add 0 ns
-      | c -> f (add c ns) (c-1) in
+      | 0 -> add (Node.SimpleNode 0) ns
+      | c -> f (add (Node.SimpleNode c) ns) (c-1) in
       f empty
 end
 
