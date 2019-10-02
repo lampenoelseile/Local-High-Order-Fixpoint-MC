@@ -31,7 +31,7 @@ let sem_log_out ?(folderpath="./outputs/") global_lvl message_lvl sem form =
     begin
       let rec helper sem path filename = 
         match sem with
-          S.Base ns ->  let oc = open_out (folderpath ^ filename ^ ".log") in
+          S.Base ns ->  let oc = open_out (folderpath ^ (String.sub filename 0 (if (String.length filename) > 20 then 20 else (String.length filename))) ^ ".log") in
                         fprintf oc "%s" (S.to_string sem);
                         close_out oc
         | S.Fun map ->  let arg_replace = ref 0 in 
@@ -54,7 +54,7 @@ let sem_log_out ?(folderpath="./outputs/") global_lvl message_lvl sem form =
                                                                               ^ "->val" ^ (string_of_int (!value_replace-1)) ^ "]\n"
                                       ) map "[\n") ^ "]"
                         in
-                        let oc = open_out (folderpath ^ filename ^ ".log") in
+                        let oc = open_out (folderpath ^ (String.sub filename 0 (if (String.length filename) > 20 then 20 else (String.length filename))) ^ ".log") in
                         fprintf oc "%s" output;
                         close_out oc
       in 

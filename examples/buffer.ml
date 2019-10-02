@@ -1,3 +1,4 @@
+open Mc 
 open Hfl
 open Lts
 module V = Verbose
@@ -11,6 +12,14 @@ let open Node in
     | false -> write (depth+1) (List.fold_left (fun lts2 symb -> 
                                           NodeSet.fold  (fun lts3 node ->
                                                           let node_name = to_string node in
+                                                          if order == (depth+1) then begin
+                                                          Lts.add_transition 
+                                                            (Lts.add_transition 
+                                                            (Lts.add_node lts3 (NamedNode (node_name ^ symb))) 
+                                                            symb (NamedNode node_name) (NamedNode (node_name ^ symb))) 
+                                                            symb (NamedNode (node_name ^ symb)) 
+                                                            (NamedNode (node_name ^ symb)) 
+                                                          end else
                                                           Lts.add_transition 
                                                             (Lts.add_node lts3 (NamedNode (node_name ^ symb))) 
                                                             symb (NamedNode node_name) (NamedNode (node_name ^ symb))
@@ -46,7 +55,17 @@ let open Node in
   in
   let lts = ref (write 1 
                       (List.fold_left 
-                        (fun lts symb -> Lts.add_transition (Lts.add_node lts (NamedNode ("w" ^ symb))) symb (NamedNode "wEps") (NamedNode ("w" ^ symb))) 
+                        (fun lts symb -> 
+                        if order == 1 then
+                          Lts.add_transition 
+                            (Lts.add_transition 
+                              (Lts.add_node lts (NamedNode ("w" ^ symb))) symb (NamedNode "wEps") (NamedNode ("w" ^ symb)))
+                            symb
+                            (NamedNode ("w" ^ symb))
+                            (NamedNode ("w" ^ symb))
+                        else
+                          Lts.add_transition (Lts.add_node lts (NamedNode ("w" ^ symb))) symb (NamedNode "wEps") (NamedNode ("w" ^ symb))
+                        ) 
                       (Lts.add_node Lts.create_empty (NamedNode "wEps")) transitions)) 
   in
   lts := read 1 
@@ -62,7 +81,7 @@ let open Node in
                             if (Char.equal (String.get name 0) 'w')
                             then true else false
                           ) 
-          (Lts.get_all_nodes !lts)) 
+          (Lts.get_all_nodes !lts))
 
 let build_formula ?(v_lvl=V.None) transitions flush_mark =
   let open Formula in
@@ -130,10 +149,10 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
     let phi2 = List.fold_left (fun form trans ->
                                 let tmp = App 
                                             (Var("X", Fun(Fun(Base,Base),Base)),
-                                            Lambda("z",Fun(Base,Base),
+                                            Lambda("z",Base,
                                                     App(
                                                       f,
-                                                      Diamond(trans,Var("z",Base))
+                                                      Diamond(trans, Var("z",Base))
                                                     )
                                                   )
                                           )
@@ -213,6 +232,6 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
     ) ) ^ "\n");
     complete
 let _ =
-  let formula = build_formula ~v_lvl:V.Info ["a";"b"] "#" in 
-  let lts = build_lts 2 ["0";"1"] "#" in
-  print_endline (Lts.to_string lts)
+  let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
+  let lts = build_lts 1 ["0";"1"] "#" in
+  model_check ~v_lvl:V.Info formula lts;

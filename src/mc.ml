@@ -2,7 +2,7 @@ open Datastructures
 open Hfl
   module F = Formula
   module S = Semantics
-
+  module SemS = SemanticsSet
 module V = Verbose
 open Tcsset
 
@@ -64,7 +64,7 @@ let rec model_check formula lts args env v_lvl indent =
                           begin 
                             match S.get_value_for_args current_val args with
                               S.Base(ns) -> V.console_out V.Detailed v_lvl 
-                                              (fun () -> indent ^ "  " ^ "Value: " ^ NodeSet.to_string ns);(ns,env)
+                                              (fun () -> indent ^ "  " ^ "Case Var - Value: " ^ NodeSet.to_string ns);(ns,env)
                             | S.Fun(map) -> assert false
                           end
                         else
@@ -76,7 +76,7 @@ let rec model_check formula lts args env v_lvl indent =
                   let value = NodeSet.diff (Lts.get_all_nodes lts) val1
                   in
                   V.console_out V.Detailed v_lvl 
-                    (fun () -> indent ^ "  " ^ "Value: " ^ NodeSet.to_string value);
+                    (fun () -> indent ^ "  " ^ "Case Negation - Value: " ^ NodeSet.to_string value);
                   (value,env)
 
   | F.Conj(phi_1, phi_2) -> V.console_out V.Detailed v_lvl 
@@ -87,7 +87,7 @@ let rec model_check formula lts args env v_lvl indent =
                             let value = NodeSet.inter val1 val2
                             in
                             V.console_out V.Detailed v_lvl 
-                              (fun () ->  indent ^ "  " ^"Value: " ^ NodeSet.to_string value);
+                              (fun () ->  indent ^ "  " ^"Case Conj - Value: " ^ NodeSet.to_string value);
                             (value,env)
 
   | F.Disj(phi_1, phi_2) -> V.console_out V.Detailed v_lvl 
@@ -97,7 +97,7 @@ let rec model_check formula lts args env v_lvl indent =
                             let value = NodeSet.union val1 val2
                             in
                             V.console_out V.Detailed v_lvl 
-                              (fun () ->  indent ^ "  " ^ "Value: " ^ NodeSet.to_string value);
+                              (fun () ->  indent ^ "  " ^ "Case Disj - Value: " ^ NodeSet.to_string value);
                             (value,env)
 
   | F.Impl(phi_1, phi_2) -> V.console_out V.Detailed v_lvl 
@@ -107,7 +107,7 @@ let rec model_check formula lts args env v_lvl indent =
                             let value = NodeSet.union val1 val2
                             in 
                             V.console_out V.Detailed v_lvl 
-                              (fun () ->  indent ^ "  " ^ "Value: " ^ NodeSet.to_string value);
+                              (fun () ->  indent ^ "  " ^ "Case Impl - Value: " ^ NodeSet.to_string value);
                             (value,env)
 
   | F.Equiv(phi_1, phi_2) ->  V.console_out V.Detailed v_lvl 
@@ -117,7 +117,7 @@ let rec model_check formula lts args env v_lvl indent =
                               let value = NodeSet.inter  val1 val2                  
                               in 
                               V.console_out V.Detailed v_lvl 
-                                (fun () ->  indent ^ "  " ^ "Value: " ^ NodeSet.to_string value);
+                                (fun () ->  indent ^ "  " ^ "Case Equiv - Value: " ^ NodeSet.to_string value);
                               (value, env)
 
   | F.Diamond(trans, phi) ->  V.console_out V.Detailed v_lvl 
@@ -129,14 +129,14 @@ let rec model_check formula lts args env v_lvl indent =
                                                                     (Lts.get_trans_predecessors_of_node lts trans n)) 
                                             val_phi;
                               V.console_out V.Detailed v_lvl 
-                                (fun () ->  indent ^ "  " ^ "Value: " ^ NodeSet.to_string !val_diamond_phi);
+                                (fun () ->  indent ^ "  " ^ "Case Diamond - Value: " ^ NodeSet.to_string !val_diamond_phi);
                               (!val_diamond_phi, env)
 
   | F.Box(trans, phi) -> V.console_out V.Detailed v_lvl 
                                 (fun () -> indent ^ "  " ^ "Case: Box " ^ trans ^ " of " ^ F.to_string phi);
                               let (value,env) = model_check (F.Neg(F.Diamond(trans, F.Neg(phi)))) lts args env v_lvl  (indent ^ "  ") in 
                               V.console_out V.Detailed v_lvl 
-                                (fun () -> indent ^ "  " ^ "Value: " ^ NodeSet.to_string value);
+                                (fun () -> indent ^ "  " ^ "Case Box - Value: " ^ NodeSet.to_string value);
                               (value,env)
 
   | F.Mu(var,var_t,phi) ->  V.console_out V.Detailed v_lvl 
@@ -144,7 +144,7 @@ let rec model_check formula lts args env v_lvl indent =
                                             ^ " regarding variable " ^ var);
                             let x = F.Var(var,var_t) in
                             let rec repeat_until map =
-                              let update = ref S.empty_fun in
+                              let update = ref (match var_t with F.Base -> S.empty_base | _ -> S.empty_fun) in
                               let defined_args = (S.get_defined_arguments (VarMap.get ~v_lvl x map)) in
                               List.iter (fun arg_list ->
                                           V.console_out V.Detailed v_lvl 
@@ -168,9 +168,13 @@ let rec model_check formula lts args env v_lvl indent =
                                 repeat_until (VarMap.set ~v_lvl x !update map)
                               end
                             in
-                            let initialized_map = VarMap.set ~v_lvl x (S.set_value_for_args S.empty_base S.empty_fun args) env in
+                            let initialized_map = VarMap.set ~v_lvl x 
+                                  (S.set_value_for_args 
+                                    S.empty_base 
+                                    (match var_t with F.Base -> S.empty_base | _ -> S.empty_fun) args) 
+                                    env 
+                            in
                             let approx = VarMap.get ~v_lvl x (repeat_until initialized_map) in
-                            V.sem_log_out V.Detailed v_lvl approx (F.Mu(var,var_t,phi));
                             (match S.get_value_for_args approx args with
                               S.Base ns -> (ns,env) (*TODO: detailed output *)
                             | S.Fun(map)-> assert false)
@@ -185,7 +189,7 @@ let rec model_check formula lts args env v_lvl indent =
                                               (List.nth args 0) env) v_lvl (indent ^ "  ")
                                 in 
                                 V.console_out V.Detailed v_lvl 
-                                  (fun () ->  indent ^ "  " ^ "Value: " ^ NodeSet.to_string value);
+                                  (fun () ->  indent ^ "  " ^ "Case Lambda " ^ var ^ " - Value: " ^ NodeSet.to_string value);
                                 (value,env)
 
   | F.App(phi_1, phi_2) ->  V.console_out V.Detailed v_lvl 
@@ -194,49 +198,52 @@ let rec model_check formula lts args env v_lvl indent =
                             let phi_2_sem = fully_calc_sem phi_2 lts [] env v_lvl (indent ^ "  ") in 
                             let (value, env) = model_check phi_1 lts (phi_2_sem :: args) env v_lvl (indent ^ "  ") in
                             V.console_out V.Detailed v_lvl 
-                              (fun () ->  indent ^ "  " ^ "Value of Arg: " 
-                                          ^ S.to_string phi_2_sem ^ "\n"^ indent ^ "  " ^ "Value Total: " 
+                              (fun () ->  indent ^ "  " ^ " Case App - Arg Value: " 
+                                          ^ S.to_string phi_2_sem ^ "\n"^ indent ^ "  " ^ "Case App - Value: " 
                                           ^ NodeSet.to_string value);
                             (value,env)
 
 and fully_calc_sem formula lts args env v_lvl indent =
   let rec helper formula lts args env v_lvl = 
     match formula with
-      F.Lambda(var, var_t, phi)  ->  let all_args = SemanticsSet.all_of_type lts var_t in
+      F.Lambda(var, var_t, phi)  ->   let all_args = SemS.all_of_type lts var_t in
                                       V.console_out V.Debug v_lvl 
-                                    (fun () -> "  Arguments: " ^ SemanticsSet.to_string all_args);
-                                  SemanticsSet.fold 
-                                    (fun arg sem -> S.set_value_for_args
-                                                      (helper phi lts (args) (VarMap.set ~v_lvl (F.Var(var,var_t)) arg env) v_lvl) 
-                                                      sem [arg]) 
-                                    all_args (S.empty_fun) 
+                                        (fun () -> "  Arguments: " ^ SemS.to_string all_args);
+                                      SemS.fold 
+                                        (fun arg sem -> S.set_value_for_args
+                                                          (helper phi lts (args) 
+                                                            (VarMap.set ~v_lvl (F.Var(var,var_t)) arg env) v_lvl
+                                                          ) 
+                                                          sem [arg]
+                                        ) 
+                                        all_args (S.empty_fun) 
                                     
-    | F.Mu(var, var_t, phi) ->  let all_args = SemanticsSet.all_of_type lts var_t in
-                                  V.console_out V.Debug v_lvl 
-                                    (fun () -> "  Arguments: " ^ SemanticsSet.to_string all_args);
-                                  SemanticsSet.fold 
-                                    (fun arg sem -> S.set_value_for_args
-                                                      (helper phi lts (args) (VarMap.set ~v_lvl (F.Var(var,var_t)) arg env) v_lvl) 
-                                                      sem [arg]) 
-                                    all_args (S.empty_fun)
-
+    | F.Mu(var, var_t, phi) ->  let (ns,_) = model_check 
+                                              (F.Mu(var, var_t, phi)) 
+                                              lts (args) 
+                                              env v_lvl indent
+                                in S.Base ns
+                                (*TODO: only fp arguments of type * -> base are possible with this *)
+                                  
     | F.Var(var,var_t) ->  if VarMap.mem (F.Var(var,var_t)) env then 
                             begin
-                              V.console_out V.Debug v_lvl 
-                                (fun () -> "Variable " ^ var ^ " exists in env map."); 
-                              VarMap.get (F.Var(var,var_t)) env 
+                              Semantics.get_value_for_args (VarMap.get (F.Var(var,var_t)) env) args
                             end 
                           else 
                             assert false
 
-    | F.App(phi_1,phi_2) -> helper phi_1 lts ((helper phi_2 lts [] env v_lvl) :: args) env v_lvl
+    | F.App(phi_1,phi_2) -> let (value,_) = 
+                              model_check phi_1 lts ((helper phi_2 lts [] env v_lvl) :: args) env v_lvl indent 
+                            in S.Base value
 
     | _ -> let (value,_) = model_check formula lts [] env v_lvl (indent ^ "  ") in S.Base(value)
   in 
   V.console_out V.Detailed v_lvl (fun () -> indent ^ "  " ^ "Calculate: " ^ F.to_string formula ^ " completely...");
   let value = helper formula lts args env v_lvl in
-  V.console_out V.Detailed v_lvl (fun () -> indent ^ "  " ^ "Value: see ./outputs/" ^ F.to_string formula ^ ".log");
-  V.sem_log_out V.Detailed v_lvl value formula;
+  (match value with 
+    S.Base(ns) -> V.console_out V.Detailed v_lvl (fun () -> indent ^ "  " ^ "Value: " ^ NodeSet.to_string ns)
+  | S.Fun(map) -> V.console_out V.Detailed v_lvl (fun () -> indent ^ "  " ^ "Value: see ./outputs/" ^ F.to_string formula ^ ".log");
+                  V.sem_log_out V.Detailed v_lvl value formula);
   value
 
 let fully_calc_sem ?(v_lvl=V.Debug) formula lts =

@@ -94,22 +94,22 @@ module Semantics = struct
                   | Fun map -> assert false)
     | Fun map_one -> (function
                       Base ns_two -> assert false
-                      | Fun map_two -> 
-                                if (TreeMap.fold 
-                                        (fun key_one value_one fold_one -> 
-                                            fold_one + TreeMap.fold 
-                                              (fun key_two value_two fold_two -> 
-                                                let value = if (compare key_one key_two ) == 0 && (compare value_one value_two) == 0 then 0 else 1 in
-                                                fold_two * value) 
-                                              map_two 1) 
-                                          map_one 0) == 0  && (TreeMap.fold 
-                                        (fun key_one value_one fold_one -> 
-                                            fold_one + TreeMap.fold 
-                                              (fun key_two value_two fold_two -> 
-                                                let value = if (compare key_one key_two ) == 0 && (compare value_one value_two) == 0 then 0 else 1 in
-                                                fold_two * value) 
-                                              map_one 1) 
-                                          map_two 0) == 0  then 0 else 1) (*TODO: W T F. Thats a weird compare (partial)*)
+                      | Fun map_two -> let keys_one = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
+                              (TreeMap.to_key_iterator map_one)) in
+                              let keys_two = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
+                              (TreeMap.to_key_iterator map_two)) in 
+                              let rec helper = function
+                                h1 :: t1 -> (function 
+                                            h2 :: t2 -> let value = compare (TreeMap.find h1 map_one) (TreeMap.find h2 map_two) 
+                                                        in if value != 0 then value else helper t1 t2
+                                          |  [] -> 1
+                                          )
+                              | [] -> (function 
+                                        h :: t -> -1
+                                      | [] -> 0
+                                      ) 
+                              in helper keys_one keys_two            
+                      )
 
   let empty_base = Base(NodeSet.empty)
   let empty_fun = Fun(TreeMap.empty compare)
@@ -130,7 +130,7 @@ module Semantics = struct
     | Fun(map) -> (function
                   | [] -> print_endline "Error."; Fun(map)
                   | h :: t -> get_value_for_args (TreeMap.find h map) t)
-  
+
   let rec set_value_for_args value = function
     | Base(ns) -> (function
                     | [] -> value

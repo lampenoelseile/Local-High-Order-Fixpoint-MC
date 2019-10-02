@@ -50,7 +50,7 @@ module NodeSet = struct
   let of_node_list = TreeSet.of_list Node.compare
   let as_node_list = TreeSet.elements
   let fold_subsets = TreeSet.fold_subsets
-
+  
   let find f ns =
       OptionUtils.get_some (fold (fun a v -> if a = None && f v then Some v else a) None ns)
 
@@ -64,7 +64,7 @@ module NodeSet = struct
 
   let max ns lessf = fold (fun v -> fun w -> if lessf v w then w else v) (some ns) ns
 
-  let to_string ns = "["^(String.concat "," (List.map Node.to_string (as_node_list ns)))^"]"
+  let to_string ns = "{"^(String.concat "," (List.map Node.to_string (as_node_list ns)))^"}"
 
   let init =
     let rec f ns = function
