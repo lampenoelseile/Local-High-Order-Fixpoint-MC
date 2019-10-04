@@ -234,4 +234,4 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
 let _ =
   let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
   let lts = build_lts 1 ["0";"1"] "#" in
-  model_check ~v_lvl:V.Info formula lts;
+  model_check ~v_lvl:V.Detailed formula lts;

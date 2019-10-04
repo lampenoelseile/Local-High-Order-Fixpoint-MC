@@ -1,3 +1,3 @@
 #not this naive solution
 
-true: package(TCSLib), package(str)
+true: package(TCSLib), package(str), package(unix)
