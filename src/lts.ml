@@ -120,6 +120,53 @@ let add_transition lts transition from_node to_node =
 
 let add_proposition lts node proposition =
   {nodes = lts.nodes; propositions = PropMap.add_node_to_prop lts.propositions proposition node; transitions = lts.transitions}
+
+let make_simple lts =
+  let module NMap = Map.Make(Node) in
+  let counter = ref 0 in
+  let node_map = NodeSet.fold 
+              (fun map node ->
+                counter := !counter + 1;
+                NMap.add node (Node.SimpleNode (!counter-1)) map
+              ) 
+              NMap.empty lts.nodes
+  in
+  let new_nodes = NodeSet.map 
+                  (fun node -> NMap.find node node_map) 
+                  lts.nodes
+  in 
+  let new_propmap = List.fold_left 
+                    (fun propmap prop -> 
+                      NodeSet.fold 
+                      (fun propmap2 node -> 
+                        PropMap.add_node_to_prop propmap2 prop (NMap.find node node_map)
+                      ) 
+                      propmap (PropMap.find prop lts.propositions)
+                    ) 
+                    PropMap.empty (PropMap.get_keys_as_list lts.propositions)
+  in
+  let new_trans_map = List.fold_left
+                      (fun tmap trans -> 
+                        NodeSet.fold 
+                        (fun tmap2 node ->
+                          NodeSet.fold 
+                          (fun tmap3 node2 -> TransitionMap.set_transition tmap2 trans (NMap.find node node_map) (NMap.find node2 node_map)) 
+                          tmap2 
+                          (TransitionMap.get_tsuccessors_of_node lts.transitions trans node)
+                        ) 
+                        tmap lts.nodes
+                      )
+                      TransitionMap.empty (TransitionMap.get_keys_as_list lts.transitions)
+  in
+    print_endline "\n";
+  print_endline 
+  (List.fold_left 
+    (fun str tuple -> 
+      let (keyy,value) = tuple in 
+      str ^ Node.to_string keyy ^ " -> " ^ Node.to_string value ^ "; ") "" (NMap.bindings node_map)
+  );
+  {nodes = new_nodes; propositions = new_propmap; transitions = new_trans_map}
+
 let range a b =
 (* SEE https://ocaml.org/learn/tutorials/99problems.html*)
   let rec aux a b =

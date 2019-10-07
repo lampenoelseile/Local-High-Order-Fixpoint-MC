@@ -26,9 +26,10 @@ module Formula : sig
     | Lambda of string * variable_t * t
     | App of t * t
 
-  val to_string : ?show_types:bool -> t -> string
+  val to_string : ?max_length:int -> ?show_types:bool -> t -> string
   (** Converts formula into string representation.
 
+      @param int maximum length of string
       @param bool flag if types should be printed
       @param formula formula to be converted
       @return string  string representation of formula

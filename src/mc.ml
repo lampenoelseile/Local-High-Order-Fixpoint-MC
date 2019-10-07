@@ -156,9 +156,11 @@ let rec model_check formula lts args env v_lvl indent =
                               List.iter
                                 (*for each argument list*) 
                                 (fun arg_list ->
-                                  V.console_out V.Detailed v_lvl 
-                                    (fun () -> indent ^ "  " ^ "LFP Arg: [" 
-                                      ^ List.fold_left (fun str arg -> S.to_string arg) "" arg_list ^ "]"); 
+                                    V.console_out V.Detailed v_lvl 
+                                      (fun () -> indent ^ "  " ^ "LFP Arg: [" 
+                                        ^ List.fold_left (fun str arg -> str ^ ";" ^ 
+                                        match arg with S.Base ns -> NodeSet.to_string ns | S.Fun map -> "HO") 
+                                    "" arg_list ^ "]"); 
                                   let (value, env_tmp) = 
                                     model_check phi lts arg_list map v_lvl (indent ^ "   " ^ "  ")
                                     (*value and (updated env) of approx for current argument*) 
@@ -192,7 +194,11 @@ let rec model_check formula lts args env v_lvl indent =
                                     env 
                             in
                             let approx = VarMap.get ~v_lvl x (repeat_until initialized_map) in
-                            V.sem_log_out V.Detailed v_lvl approx (F.Mu(var,var_t,phi));
+                            (match approx with 
+                              S.Base ns -> V.console_out V.Detailed v_lvl 
+                                            (fun () -> "FP - Value:" ^ NodeSet.to_string ns)
+                            | _ -> V.sem_log_out V.Detailed v_lvl approx (F.Mu(var,var_t,phi)));
+
                             (match S.get_value_for_args approx args with
                               S.Base ns -> (ns,env)
                             | S.Fun(map)-> assert false)
@@ -238,7 +244,7 @@ and fully_calc_sem formula lts args env v_lvl indent =
     | F.Mu(var, var_t, phi) ->  let (ns,_) = model_check 
                                               (F.Mu(var, var_t, phi)) 
                                               lts (args) 
-                                              env v_lvl ("  " ^ indent)
+                                              env V.None ("  " ^ indent)
                                 in S.Base ns
                                 (*TODO: only fp arguments of type * -> base are possible with this *)
                                   
@@ -250,10 +256,10 @@ and fully_calc_sem formula lts args env v_lvl indent =
                             assert false
 
     | F.App(phi_1,phi_2) -> let (value,_) = 
-                              model_check phi_1 lts ((helper phi_2 lts [] env v_lvl) :: args) env v_lvl (indent ^ "  ")
+                              model_check phi_1 lts ((helper phi_2 lts [] env v_lvl) :: args) env V.None (indent ^ "  ")
                             in S.Base value
 
-    | _ -> let (value,_) = model_check formula lts [] env v_lvl (indent ^ "  ") in S.Base(value)
+    | _ -> let (value,_) = model_check formula lts [] env V.None (indent ^ "  ") in S.Base(value)
   in 
   V.console_out V.Detailed v_lvl (fun () -> indent ^ "Calculate: " ^ F.to_string formula ^ " completely...");
   let value = helper formula lts args env v_lvl in

@@ -12,6 +12,8 @@ module Node : sig
    |  NamedNode of string
 
    val to_string : t -> string
+
+   val compare : t -> t -> int
 end
 (** Type for nodesets. Based on TreeSet.
     @see <https://github.com/tcsprojects/tcslib/blob/master/src/data/tcsset.ml> Treeset of TCSSet

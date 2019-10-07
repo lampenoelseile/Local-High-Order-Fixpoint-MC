@@ -86,3 +86,5 @@ val to_string : t -> string
 (** Makes console output of current LTS.
     @param t lts to be printed
  *)
+
+val make_simple : t -> t

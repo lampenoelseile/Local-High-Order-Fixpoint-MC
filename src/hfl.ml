@@ -26,7 +26,7 @@ module Formula = struct
     | Lambda of string * variable_t * t
     | App of t * t
 
-  let to_string ?(show_types=false) phi = 
+  let to_string ?(max_length = 50) ?(show_types=false) phi = 
     let s_type id t = 
       if show_types then Format.sprintf "(%s:%s)" id (string_of_var_t t)
       else id in
@@ -54,7 +54,14 @@ module Formula = struct
       | App(phi,psi) ->
     Format.sprintf "%s %s" (f_app phi) (f psi)
       | _ as phi -> f phi
-    in f phi
+    in 
+    let value = f phi in
+    let val_length = String.length value in
+    if val_length <= max_length-3 then
+      value
+    else
+    (String.sub value 0 (max_length / 2)) ^ " ... " 
+    ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
 
     let rec nu_to_mu f = 
       let rec helper var = function

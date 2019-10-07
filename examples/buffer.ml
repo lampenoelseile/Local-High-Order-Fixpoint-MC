@@ -1,10 +1,10 @@
-open Mc 
+open Mc
 open Hfl
 open Lts
 module V = Verbose
 open Datastructures
 
-let build_lts order transitions flush_mark =
+let build_named_lts order transitions flush_mark =
 let open Node in
   let rec write depth lts =
     match (order == depth) with
@@ -12,7 +12,7 @@ let open Node in
     | false -> write (depth+1) (List.fold_left (fun lts2 symb -> 
                                           NodeSet.fold  (fun lts3 node ->
                                                           let node_name = to_string node in
-                                                          if order == (depth+1) then begin
+                                                          if false then begin
                                                           Lts.add_transition 
                                                             (Lts.add_transition 
                                                             (Lts.add_node lts3 (NamedNode (node_name ^ symb))) 
@@ -38,10 +38,12 @@ let open Node in
       true -> lts
     | false -> write (depth+1) (List.fold_left (fun lts2 symb -> 
                                           NodeSet.fold  (fun lts3 node ->
-                                                          let node_name = to_string node in
+                                                          let node_name_sub = String.sub 
+                                                                                (to_string node) 1 ((String.length (to_string node))-1) 
+                                                          in
                                                           Lts.add_transition 
-                                                            (Lts.add_node lts3 (NamedNode (node_name ^ symb))) 
-                                                            symb (NamedNode (node_name ^ symb)) (NamedNode node_name)
+                                                            (Lts.add_node lts3 (NamedNode ("r" ^ symb ^ node_name_sub))) 
+                                                            symb (NamedNode ("r" ^ symb ^ node_name_sub)) (NamedNode ("r" ^ node_name_sub))
                                                         ) 
                                           lts2 
                                           (NodeSet.filter (fun node -> let name = to_string node in 
@@ -56,7 +58,7 @@ let open Node in
   let lts = ref (write 1 
                       (List.fold_left 
                         (fun lts symb -> 
-                        if order == 1 then
+                        if false then
                           Lts.add_transition 
                             (Lts.add_transition 
                               (Lts.add_node lts (NamedNode ("w" ^ symb))) symb (NamedNode "wEps") (NamedNode ("w" ^ symb)))
@@ -172,8 +174,8 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
                 )
               )
     in
-    V.console_out v_lvl V.Info (fun () -> "Formula PSI:\n" ^ to_string ~show_types:false psi ^ "\n");
-    V.console_out v_lvl V.Info (fun () -> "Formula PHI:\n" ^ to_string ~show_types:false (Mu("X",Fun(Fun(Base,Base),Base),
+    V.console_out v_lvl V.Info (fun () -> "Formula PSI:\n" ^ to_string ~max_length:200 ~show_types:false psi ^ "\n");
+    V.console_out v_lvl V.Info (fun () -> "Formula PHI:\n" ^ to_string ~max_length:200 ~show_types:false (Mu("X",Fun(Fun(Base,Base),Base),
                 Lambda("f",Fun(Base,Base),
                   Disj(
                     Prop "PSI",
@@ -206,7 +208,7 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
         )
       )
     ) in 
-    V.console_out v_lvl V.Info (fun () -> "Formula COMPLETE:\n" ^ to_string ~show_types:false (Neg(
+    V.console_out v_lvl V.Info (fun () -> "Formula COMPLETE:\n" ^ to_string ~max_length:200 ~show_types:false (Neg(
       App(
         Lambda("g",Fun(Base,Base),
           App(
@@ -233,5 +235,5 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
     complete
 let _ =
   let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
-  let lts = build_lts 1 ["0";"1"] "#" in
-  model_check ~v_lvl:V.Detailed formula lts;
+  let lts = Lts.make_simple (build_named_lts 2 ["0";"1"] "#") in
+  model_check ~v_lvl:V.Info formula lts;
