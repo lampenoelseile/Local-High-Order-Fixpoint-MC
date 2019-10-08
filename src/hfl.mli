@@ -54,7 +54,7 @@ module Semantics : sig
   val empty_base : t
   val empty_fun : t
 
-  val to_string : t -> string
+  val to_string : ?max_length:int -> t -> string
   (*  Returns string representation of given semantic object.
       @param t semantic object
       @return string representation

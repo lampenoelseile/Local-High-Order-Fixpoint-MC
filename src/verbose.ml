@@ -26,6 +26,10 @@ let (>=) = function
 let console_out global_lvl message_lvl message =
   if global_lvl >= message_lvl then print_endline (message ()) else ()
 
+let duration_out global_lvl message_lvl time_start time_end prefix =
+  if global_lvl >= message_lvl then 
+    Printf.printf "%sDuration: %.5fs\n%!" prefix (time_end-.time_start)
+
 let sem_log_out ?(folderpath="./outputs/") global_lvl message_lvl sem form =
   if global_lvl >= message_lvl then
     begin

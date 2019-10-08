@@ -90,10 +90,24 @@ module Semantics = struct
     | Base of NodeSet.t
     | Fun of (t,t) TreeMap.t
   
-  let rec to_string sem = 
+  let rec to_string ?(max_length = 100) sem = 
     match sem with
     | Base(ns) -> NodeSet.to_string ns
-    | Fun(map) -> (TreeMap.fold (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") map "[") ^ "]"
+    | Fun(map) -> let value = 
+                    (TreeMap.fold 
+                      (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") 
+                      map "["
+                    ) 
+                    ^ "]"
+                  in
+                  let val_length = String.length value in
+                  if val_length <= max_length-3 then
+                    value
+                  else
+                  (String.sub value 0 (max_length / 2)) ^ " ... " 
+                  ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
+
+
   
   let rec compare = function
     Base ns_one ->  (function
@@ -104,7 +118,7 @@ module Semantics = struct
                       | Fun map_two -> let keys_one = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
                               (TreeMap.to_key_iterator map_one)) in
                               let keys_two = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
-                              (TreeMap.to_key_iterator map_two)) in 
+                              (TreeMap.to_key_iterator map_two)) in
                               let rec helper = function
                                 h1 :: t1 -> (function 
                                             h2 :: t2 -> let value = compare (TreeMap.find h1 map_one) (TreeMap.find h2 map_two) 
@@ -115,7 +129,8 @@ module Semantics = struct
                                         h :: t -> -1
                                       | [] -> 0
                                       ) 
-                              in helper keys_one keys_two            
+                              in 
+                              helper keys_one keys_two            
                       )
 
   let empty_base = Base(NodeSet.empty)
