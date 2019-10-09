@@ -9,11 +9,16 @@ module Formula : sig
     | Base 
     | Fun of variable_t * variable_t
 
+  type fp_t =
+    NoFP
+  | LFP
+  | GFP
+
   type t =
     (* type of formulas. *)
     | Const of bool
     | Prop of string
-    | Var of string * variable_t
+    | Var of string * variable_t * fp_t
     | Neg of t
     | Conj of t * t
     | Disj of t * t
@@ -34,8 +39,6 @@ module Formula : sig
       @param formula formula to be converted
       @return string  string representation of formula
   *)
-
-  val nu_to_mu : t -> t
 end
 
 module Semantics : sig

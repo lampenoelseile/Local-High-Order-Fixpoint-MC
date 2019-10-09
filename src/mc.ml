@@ -23,13 +23,13 @@ module VarMap  = struct (*TODO: Add typecheck between var_t and value and except
   let set ?(v_lvl=V.None) argument value map = 
     (* sets / initializes value for given argument*)
     match argument with
-      F.Var(var_name,var_t) ->  TreeMap.add argument value map  
+      F.Var(var_name,var_t,fp_t) ->  TreeMap.add argument value map  
     | _ ->  assert false 
 
   let get ?(v_lvl=V.None) argument map =
     (* Returns current value for given argument. safetychecks included*)
     match argument with
-      F.Var(var_name,var_t) ->  if mem argument map then
+      F.Var(var_name,var_t,fp_t) ->  if mem argument map then
                                   TreeMap.find argument map
                                 else
                                   assert false   
@@ -59,10 +59,10 @@ let rec model_check formula lts args env v_lvl indent =
                       (fun () -> indent ^ "Case: Prop " ^ prop ^ " - Value: " ^ NodeSet.to_string value);
                     (value,env)
                     
-  | F.Var(var,var_t) -> V.console_out V.Detailed v_lvl 
+  | F.Var(var,var_t,fp_t) -> V.console_out V.Detailed v_lvl 
                           (fun () -> indent ^ "Case: Var " ^ var);
                         let start_time = Unix.gettimeofday() in
-                        let current_val = (VarMap.get (F.Var(var, var_t)) env) in
+                        let current_val = (VarMap.get (F.Var(var, var_t,fp_t)) env) in
                         if S.is_defined_for_args current_val args then begin 
                           match S.get_value_for_args current_val args with
                             S.Base(ns) -> 
@@ -73,15 +73,26 @@ let rec model_check formula lts args env v_lvl indent =
                                           (ns,env)
                           | S.Fun(map) -> assert false
                         end else begin
-                          let end_time = Unix.gettimeofday () in
-                          V.console_out V.Detailed v_lvl 
-                            (fun () -> indent ^ "Case Var - Value: {} (undef)");
-                          V.duration_out V.Detailed v_lvl start_time end_time indent;
-                          (
-                            NodeSet.empty, 
-                            VarMap.set ~v_lvl (Var (var,var_t)) 
-                              (S.set_value_for_args (Base NodeSet.empty) current_val args) env
-                          )
+                          match fp_t with 
+                            F.NoFP -> assert false 
+                          | F.LFP ->  let end_time = Unix.gettimeofday () in
+                                      V.console_out V.Detailed v_lvl 
+                                        (fun () -> indent ^ "Case Var - Value: {} (undef)");
+                                      V.duration_out V.Detailed v_lvl start_time end_time indent;
+                                      (
+                                        NodeSet.empty, 
+                                        VarMap.set ~v_lvl (Var(var,var_t,fp_t)) 
+                                          (S.set_value_for_args (Base NodeSet.empty) current_val args) env
+                                      )
+                          | F.GFP ->  let end_time = Unix.gettimeofday () in
+                                      V.console_out V.Detailed v_lvl 
+                                        (fun () -> indent ^ "Case Var - Value: S (undef)");
+                                      V.duration_out V.Detailed v_lvl start_time end_time indent;
+                                      (
+                                        (Lts.get_all_nodes lts), 
+                                        VarMap.set ~v_lvl (Var(var,var_t,fp_t)) 
+                                          (S.set_value_for_args (Base (Lts.get_all_nodes lts)) current_val args) env
+                                      )
                         end
 
   | F.Neg(phi) -> V.console_out V.Detailed v_lvl 
@@ -153,7 +164,7 @@ let rec model_check formula lts args env v_lvl indent =
   | F.Mu(var,var_t,phi) ->  V.console_out V.Detailed v_lvl 
                                 (fun () -> indent ^ "Case: LFP of " ^ F.to_string phi 
                                     ^ " regarding variable " ^ var);
-                            let x = F.Var(var,var_t) in
+                            let x = F.Var(var,var_t,LFP) in
                             let rec repeat_until map =
                               (*repeat until approximation is found (i.e. fixpoint) 
                                 returns env including fp approximation for x.
@@ -197,7 +208,7 @@ let rec model_check formula lts args env v_lvl indent =
                               begin (*last and second to last iteration differ *)
                                 let end_time = Unix.gettimeofday () in
                                 V.console_out V.Detailed v_lvl (fun () -> indent ^ "Approximation changed.");
-                                V.duration_out V.Info v_lvl start_time end_time (indent ^ "FP Approx Step - ");
+                                V.duration_out V.Detailed v_lvl start_time end_time (indent ^ "FP Approx Step - ");
                                 repeat_until (VarMap.set ~v_lvl x !update map)
                               end
                             in
@@ -211,19 +222,83 @@ let rec model_check formula lts args env v_lvl indent =
                             (match approx with 
                               S.Base ns -> V.console_out V.Detailed v_lvl 
                                             (fun () -> "FP - Value:" ^ NodeSet.to_string ns)
-                            | _ -> V.sem_log_out V.Info v_lvl approx (F.Mu(var,var_t,phi)));
+                            | _ -> V.sem_log_out V.Detailed v_lvl approx (F.Mu(var,var_t,phi)));
 
                             (match S.get_value_for_args approx args with
                               S.Base ns -> (ns,env)
                             | S.Fun(map)-> assert false)
                             
-  | F.Nu(var,var_t,phi) ->  let (value, env) = model_check (F.nu_to_mu (F.Nu(var,var_t,phi))) lts args env v_lvl (indent ^ "  ") in 
-                            (value,env) (*TODO: detailed output *)
+  | F.Nu(var,var_t,phi) ->  V.console_out V.Detailed v_lvl 
+                                (fun () -> indent ^ "Case: GFP of " ^ F.to_string phi 
+                                    ^ " regarding variable " ^ var);
+                            let x = F.Var(var,var_t,GFP) in
+                            let rec repeat_until map =
+                              (*repeat until approximation is found (i.e. fixpoint) 
+                                returns env including fp approximation for x.
+                              *)
+                              let start_time = Unix.gettimeofday () in
+                              let update = ref 
+                                (match var_t with 
+                                  F.Base -> S.Base (Lts.get_all_nodes lts) | _ -> S.empty_fun) 
+                              in
+                              let defined_args = (S.get_defined_arguments (VarMap.get ~v_lvl x map)) in
+                              List.iter
+                                (*for each argument list*) 
+                                (fun arg_list ->
+                                    V.console_out V.Detailed v_lvl 
+                                      (fun () -> indent ^ "  " ^ "LFP Arg: [" 
+                                        ^ List.fold_left (fun str arg -> str ^ S.to_string arg ^ ";") 
+                                    "" arg_list ^ "]");
+                                  let (value, env_tmp) = 
+                                    model_check phi lts arg_list map v_lvl (indent ^ "   " ^ "  ")
+                                    (*value and (updated env) of approx for current argument*) 
+                                  in
+                                  let defined_args_tmp = S.get_defined_arguments (VarMap.get ~v_lvl x env_tmp) in
+                                    List.iter (*add new arguments to update, which occured first time in this iteration*) 
+                                    (fun arg_list_tmp -> 
+                                      update := 
+                                      S.set_value_for_args 
+                                        (S.get_value_for_args (VarMap.get ~v_lvl x env_tmp) arg_list_tmp) 
+                                        !update arg_list_tmp
+                                    ) 
+                                  (List.filter (fun x -> not (List.mem x defined_args)) defined_args_tmp);
+                                  update := S.set_value_for_args (S.Base value) !update arg_list
+                                ) 
+                                defined_args;
+                              if S.compare !update (VarMap.get ~v_lvl x map) == 0 then
+                              begin (*last and second to last iteration are equal *)
+                                let end_time = Unix.gettimeofday () in 
+                                V.console_out V.Detailed v_lvl (fun () -> indent ^ "FP found.");
+                                V.duration_out V.Detailed v_lvl start_time end_time (indent ^ "FP Approx Step - ");
+                                map
+                              end else
+                              begin (*last and second to last iteration differ *)
+                                let end_time = Unix.gettimeofday () in
+                                V.console_out V.Detailed v_lvl (fun () -> indent ^ "Approximation changed.");
+                                V.duration_out V.Detailed v_lvl start_time end_time (indent ^ "FP Approx Step - ");
+                                repeat_until (VarMap.set ~v_lvl x !update map)
+                              end
+                            in
+                            let initialized_map = VarMap.set ~v_lvl x 
+                                  (S.set_value_for_args 
+                                    (S.Base (Lts.get_all_nodes lts))
+                                    (match var_t with F.Base -> S.Base (Lts.get_all_nodes lts) | _ -> S.empty_fun) args) 
+                                    env 
+                            in
+                            let approx = VarMap.get ~v_lvl x (repeat_until initialized_map) in
+                            (match approx with 
+                              S.Base ns -> V.console_out V.Detailed v_lvl 
+                                            (fun () -> "FP - Value:" ^ NodeSet.to_string ns)
+                            | _ -> V.sem_log_out V.Detailed v_lvl approx (F.Mu(var,var_t,phi)));
+
+                            (match S.get_value_for_args approx args with
+                              S.Base ns -> (ns,env)
+                            | S.Fun(map)-> assert false)
 
   | F.Lambda(var,var_t,phi) ->  V.console_out V.Detailed v_lvl 
                                   (fun () ->  indent ^ "Case: Lambda " ^ var ^ " of " 
                                               ^ F.to_string phi );
-                                let (value,env) = model_check phi lts (List.tl args) (VarMap.set (F.Var (var,var_t)) 
+                                let (value,env) = model_check phi lts (List.tl args) (VarMap.set (F.Var(var,var_t,F.NoFP)) 
                                               (List.nth args 0) env) v_lvl (indent ^ "  ")
                                 in 
                                 V.console_out V.Detailed v_lvl 
@@ -247,7 +322,7 @@ and fully_calc_sem formula lts args env v_lvl indent =
                                       SemS.fold 
                                         (fun arg sem -> S.set_value_for_args
                                                           (helper phi lts (args) 
-                                                            (VarMap.set ~v_lvl (F.Var(var,var_t)) arg env) v_lvl
+                                                            (VarMap.set ~v_lvl (F.Var(var,var_t,NoFP)) arg env) v_lvl
                                                           ) 
                                                           sem [arg]
                                         ) 
@@ -259,13 +334,11 @@ and fully_calc_sem formula lts args env v_lvl indent =
                                               env V.None ("  " ^ indent)
                                 in S.Base ns
                                 (*TODO: only fp arguments of type * -> base are possible with this *)
+                                (*TODO: GFP?!*)
                                   
-    | F.Var(var,var_t) ->  if VarMap.mem (F.Var(var,var_t)) env then 
-                            begin
-                              Semantics.get_value_for_args (VarMap.get (F.Var(var,var_t)) env) args
-                            end 
-                          else 
-                            assert false
+    | F.Var(var,var_t,fp_t) ->  if VarMap.mem (F.Var(var,var_t,fp_t)) env then 
+                                  S.get_value_for_args (VarMap.get (F.Var(var,var_t,fp_t)) env) args
+                                else assert false
 
     | F.App(phi_1,phi_2) -> let (value,_) = 
                               model_check phi_1 lts ((helper phi_2 lts [] env v_lvl) :: args) env V.None (indent ^ "  ")

@@ -7,13 +7,18 @@ module Formula = struct
   | Base
   | Fun of variable_t * variable_t
 
+  type fp_t =
+  | NoFP
+  | LFP 
+  | GFP
+
   let rec string_of_var_t = function
   | Base -> "base"
   | Fun(a,b) -> Format.sprintf "%s -> %s" (string_of_var_t a) (string_of_var_t b)
   type t = 
     | Const of bool
     | Prop of string
-    | Var of string * variable_t
+    | Var of string * variable_t * fp_t
     | Neg of t
     | Conj of t * t
     | Disj of t * t
@@ -26,14 +31,14 @@ module Formula = struct
     | Lambda of string * variable_t * t
     | App of t * t
 
-  let to_string ?(max_length = 50) ?(show_types=false) phi = 
+  let to_string ?(max_length = 200) ?(show_types=false) phi = 
     let s_type id t = 
       if show_types then Format.sprintf "(%s:%s)" id (string_of_var_t t)
       else id in
     let rec f = function
       | Const(b) -> if b then "true" else "false"
       | Prop(prop_var) -> Format.sprintf "%s" prop_var
-      | Var(var,t) -> s_type var t
+      | Var(var,t,fp) -> s_type var t
       | Neg(phi) -> Format.sprintf "~%s" (f phi) 
       | Conj(phi1, phi2) -> Format.sprintf "(%s && %s)" (f phi1) (f phi2) 
       | Disj(phi1, phi2) -> Format.sprintf "(%s || %s)" (f phi1) (f phi2) 
@@ -62,27 +67,6 @@ module Formula = struct
     else
     (String.sub value 0 (max_length / 2)) ^ " ... " 
     ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
-
-    let rec nu_to_mu f = 
-      let rec helper var = function
-          Const(b) -> Const b
-        | Prop(prop_var) -> Prop prop_var
-        | Var(varr,t) -> if var == varr then Neg (Var (varr,t)) else Var(varr,t)
-        | Neg(phi) -> Neg (helper var phi)
-        | Conj(phi1, phi2) -> Conj((helper var phi1),(helper var phi2))
-        | Disj(phi1, phi2) -> Disj((helper var phi1),(helper var phi2)) 
-        | Impl(phi1, phi2) -> Impl((helper var phi1),(helper  var phi2))
-        | Equiv(phi1, phi2) -> Equiv((helper var phi1),(helper var phi2))
-        | Diamond(action, phi) -> Diamond(action, helper var phi)
-        | Box(action, phi) -> Box(action, helper var phi) 
-        | Mu(varr,t,phi) -> Mu(varr,t,helper var phi)
-        | Nu(varr,t,phi) -> Nu(varr,t,helper var phi)
-        | Lambda(varr,t,phi) -> Lambda(varr,t,helper var phi)
-        | App(phi,psi) -> App(helper var phi, helper var psi)
-      in
-      match f with
-       Nu(var, t, phi) -> Neg (Mu(var,t, helper var phi))
-      | _ -> assert false
 end
   
 module Semantics = struct
@@ -90,7 +74,7 @@ module Semantics = struct
     | Base of NodeSet.t
     | Fun of (t,t) TreeMap.t
   
-  let rec to_string ?(max_length = 100) sem = 
+  let rec to_string ?(max_length = 200) sem = 
     match sem with
     | Base(ns) -> NodeSet.to_string ns
     | Fun(map) -> let value = 
@@ -142,15 +126,17 @@ module Semantics = struct
                   | _ ->  assert false)
     | Fun(map) -> (function
                   | [] -> assert false
+                  | h :: [] -> TreeMap.mem h map 
                   | h :: t ->  let value = TreeMap.mem h map in
                                 value && is_defined_for_args (TreeMap.find h map) t)
 
   let rec get_value_for_args = function
     | Base(ns) -> (function
                   | [] -> Base(ns)
-                  | _ -> print_endline "Error."; Base(ns))  
+                  | _ -> assert false)
     | Fun(map) -> (function
-                  | [] -> print_endline "Error."; Fun(map)
+                  | [] -> assert false
+                  | h :: [] -> TreeMap.find h map
                   | h :: t -> get_value_for_args (TreeMap.find h map) t)
 
   let rec set_value_for_args value = function
@@ -159,7 +145,7 @@ module Semantics = struct
                     | _ ->  assert false)
     | Fun(map) ->  (function
                     | [] ->  assert false
-                    | h :: [] -> Fun(TreeMap.add h value map);
+                    | h :: [] -> Fun(TreeMap.add h value map)
                     | h :: t -> if is_defined_for_args (Fun map) [h] then
                                   Fun(TreeMap.add h (set_value_for_args value (TreeMap.find h map) t) map)
                                 else
@@ -173,13 +159,21 @@ module Semantics = struct
     let rec get_defined_arguments = function
     Base(ns) -> [[]]
   | Fun(map) -> if TreeMap.is_empty map then []
-                else(
+                else begin
                   let args = Tcsbasedata.Iterators.to_list 
                               (TreeMap.to_key_iterator map) 
                   in
-                  List.fold_left (fun list arg ->
-                                    (List.map (fun arg_list -> arg :: arg_list) (get_defined_arguments (get_value_for_args (Fun map) [arg]))) @ list) 
-                    [] args)
+                  List.fold_left 
+                    (fun list arg ->
+                      (List.map 
+                        (fun arg_list -> arg :: arg_list) 
+                        (get_defined_arguments (get_value_for_args (Fun map) [arg]))
+                      ) 
+                      @ list
+                    ) 
+                    [] 
+                    args
+                end
 
 end
 

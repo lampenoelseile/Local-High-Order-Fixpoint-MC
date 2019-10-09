@@ -87,8 +87,8 @@ let open Node in
 
 let build_formula ?(v_lvl=V.None) transitions flush_mark =
   let open Formula in
-  let f = Var("f",Fun(Base,Base)) in 
-  let g = Var("g",Fun(Base,Base)) in
+  let f = Var("f",Fun(Base,Base),NoFP) in 
+  let g = Var("g",Fun(Base,Base),NoFP) in
   let psi = List.fold_left  (fun form1 trans1 ->
                               let new_part =
                                 Disj( 
@@ -150,11 +150,11 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
     in
     let phi2 = List.fold_left (fun form trans ->
                                 let tmp = App 
-                                            (Var("X", Fun(Fun(Base,Base),Base)),
+                                            (Var("X", Fun(Fun(Base,Base),Base),LFP),
                                             Lambda("z",Base,
                                                     App(
                                                       f,
-                                                      Diamond(trans, Var("z",Base))
+                                                      Diamond(trans, Var("z",Base,NoFP))
                                                     )
                                                   )
                                           )
@@ -189,15 +189,15 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
         Lambda("g",Fun(Base,Base),
           App(
             phi,
-            Lambda("x",Base,Var("x",Base))
+            Lambda("x",Base,Var("x",Base,NoFP))
           )
         ),
         Lambda("y", Base,
           Mu("Y",Base,
             Disj(
-              Var("y", Base),
+              Var("y", Base,NoFP),
               (List.fold_left  (fun form trans ->
-                                let tmp = Diamond(trans, Var("Y",Base)) in
+                                let tmp = Diamond(trans, Var("Y",Base,LFP)) in
                                 match form with
                                 | Const b -> tmp
                                 | _ -> Disj(form,tmp)
@@ -213,15 +213,15 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
         Lambda("g",Fun(Base,Base),
           App(
             Prop "PHI",
-            Lambda("x",Base,Var("x",Base))
+            Lambda("x",Base,Var("x",Base,NoFP))
           )
         ),
         Lambda("y", Base,
           Mu("Y",Base,
             Disj(
-              Var("y", Base),
+              Var("y", Base,NoFP),
               (List.fold_left  (fun form trans ->
-                                let tmp = Diamond(trans, Var("Y",Base)) in
+                                let tmp = Diamond(trans, Var("Y",Base,LFP)) in
                                 match form with
                                 | Const b -> tmp
                                 | _ -> Disj(form,tmp)
@@ -237,7 +237,7 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
 
 let _ =
   let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
-  let lts = build_named_lts 1 ["0";"1"] "#" in
+  let lts = build_named_lts 2 ["0";"1"] "#" in
   let lts_broken = Lts.add_transition lts "0" (Node.NamedNode "r0") (Node.NamedNode ("r1")) 
   in
   model_check ~v_lvl:V.Info formula lts;

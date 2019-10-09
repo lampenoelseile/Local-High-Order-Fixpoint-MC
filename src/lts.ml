@@ -115,7 +115,7 @@ let create_dummy_from_nodeset nodeset =
 let add_node lts node =
   {nodes = NodeSet.add node lts.nodes; propositions = lts.propositions; transitions = lts.transitions}
 
-let add_transition lts transition from_node to_node =
+let add_transition lts transition from_node to_node = (*TODO Check if exist *)
   {nodes = lts.nodes; propositions = lts.propositions; transitions = TransitionMap.set_transition lts.transitions transition from_node to_node}
 
 let add_proposition lts node proposition =
