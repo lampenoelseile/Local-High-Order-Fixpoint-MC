@@ -1,4 +1,4 @@
-open Datastructures
+open Basedata
 open Hfl
   module F = Formula
   module S = Semantics
@@ -29,10 +29,10 @@ module VarMap  = struct (*TODO: Add typecheck between var_t and value and except
   let get ?(v_lvl=V.None) argument map =
     (* Returns current value for given argument. safetychecks included*)
     match argument with
-      F.Var(var_name,var_t,fp_t) ->  if mem argument map then
-                                  TreeMap.find argument map
-                                else
-                                  assert false   
+      F.Var(var_name,var_t,fp_t) -> if mem argument map then
+                                      TreeMap.find argument map
+                                    else 
+                                      assert false 
     | _ ->  assert false
 end
 

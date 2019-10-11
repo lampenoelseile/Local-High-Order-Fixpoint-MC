@@ -1,6 +1,7 @@
 (** For detailed information see lts.mli *)
 open Tcsbasedata
 open Tcsset
+open MLBDD
 
 (* NODE *)
 module Node = struct
@@ -85,4 +86,8 @@ module PropSet = struct
   let union = TreeSet.union
 
   let to_string ps = "["^(String.concat "," (as_string_list ps))^"]"
+end
+
+module NodeSetBDD = struct
+  type t = MLBDD.t
 end

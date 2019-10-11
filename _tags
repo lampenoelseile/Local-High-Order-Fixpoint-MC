@@ -1,3 +1,3 @@
-#not this naive solution
+<src> or <src/utilities> or <src/structures>: include
 
-true: package(TCSLib), package(str), package(unix)
+true: package(TCSLib), package(mlbdd), package(str), package(unix), package(math)

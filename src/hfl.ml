@@ -1,5 +1,5 @@
 (* For high-level info about public parts see formulas.mli *)
-open Datastructures
+open Basedata
 open Tcsset
 
 module Formula = struct

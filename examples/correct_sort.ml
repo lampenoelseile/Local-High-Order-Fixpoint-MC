@@ -2,7 +2,7 @@ open Mc
 open Hfl
 open Lts
 module V = Verbose
-open Datastructures
+open Basedata
 
 let build_lts ~zero_max_count ~one_max_count =
   let open Node in 
@@ -68,8 +68,8 @@ let build_lts ~zero_max_count ~one_max_count =
   let lts_read_write = 
     Lts.add_proposition 
       (List.fold_left (fun lts node -> Lts.add_node lts node) lts_write (build2 [] zero_max_count one_max_count)) 
-      (NamedNode "r0-0") 
-      "END"
+      (NamedNode "w0-0") 
+      "START"
   in
   let lts_read_write_trans =
     NodeSet.fold 
@@ -93,7 +93,7 @@ let build_lts ~zero_max_count ~one_max_count =
         (Lts.get_all_nodes lts_read_write)
     )
   in
-  NodeSet.fold
+  Lts.turn_transitions (NodeSet.fold
     (fun lts node ->
       NodeSet.fold
         (fun lts2 node2 ->
@@ -116,22 +116,23 @@ let build_lts ~zero_max_count ~one_max_count =
         (String.get (to_string node) 0) == 'w'
       )
       (Lts.get_all_nodes lts_read_write_trans)
-    )
+    ))
 
 let build_formula ?(v_lvl=V.None) transitions flush_mark =
  let open Formula in 
   let id1 = Lambda ("z1", Base, Var("z1",Base,NoFP)) in
-  let id2 = Lambda ("z2", Base, Var("z2",Base,NoFP)) in
-  let arg11 = Lambda ("x1", Base, Diamond("0", App((Var("f", Fun(Base,Base),NoFP)),(Var("x1",Base,NoFP))))) in
-  let arg12 = Lambda ("y1", Base, Box("0", App((Var ("g", Fun(Base,Base),NoFP)), Var("y1",Base,NoFP)))) in
-  let arg21 = Lambda ("x2", Base, App((Var("f", Fun(Base,Base),NoFP)),Diamond("1",Var("x2",Base,NoFP)))) in
-  let arg22 = Lambda ("y2", Base, Box("1", App((Var ("g", Fun(Base,Base),NoFP)), Var("y2",Base,NoFP)))) in
+  let start = Prop ("START") in
+  let arg11 = Lambda ("x1", Base, Box("1", App((Var("f", Fun(Base,Base),NoFP)),(Var("x1",Base,NoFP))))) in
+  let arg12 = Diamond("1", Var ("g",Base, NoFP)) in
+  let arg21 = Lambda ("x2", Base, App((Var("f", Fun(Base,Base),NoFP)),Box("0",Var("x2",Base,NoFP)))) in
+  let arg22 = Diamond("0", Var ("g",Base, NoFP)) in
 
-  App(App(Nu("X", Fun(Fun(Base,Base),Fun(Fun(Base,Base),Base)), 
+  App(
+    App(Nu("X", Fun(Fun(Base,Base),Fun(Fun(Base,Base),Base)), 
     Lambda("f", Fun(Base,Base), 
-      (Lambda("g", Fun(Base,Base), 
+      (Lambda("g", Base, 
           Conj(
-            App(Var("g", Fun(Base,Base),NoFP), Box("#", App(Var("f", Fun(Base,Base),NoFP), Prop "END"))), 
+            App(Var("f", Fun(Base,Base),NoFP), Box("#", Var("g",Base,NoFP))), 
             Conj(
               App(App(Var("X",Fun(Fun(Base,Base),Fun(Fun(Base,Base),Base)),GFP), arg11),arg12),
               App(App(Var("X",Fun(Fun(Base,Base),Fun(Fun(Base,Base),Base)),GFP), arg21),arg22)
@@ -140,10 +141,10 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
           )
         )
       )
-    ),id1),id2)
+    ),id1),start)
 
 let _ =
   let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
-  let lts = build_lts ~zero_max_count:1 ~one_max_count:1 in
-  let lts_broken = Lts.add_transition lts "0" (NamedNode "w0-1") (NamedNode "w0-0") in
-  model_check ~v_lvl:V.Detailed formula lts;
+  let lts = build_lts ~zero_max_count:1 ~one_max_count:2 in
+  let lts_broken = Lts.add_transition lts "1" (NamedNode "r0-1") (NamedNode "r0-1") in
+  model_check ~v_lvl:V.Info formula lts;

@@ -2,7 +2,7 @@ open Mc
 open Hfl
 open Lts
 module V = Verbose
-open Datastructures
+open Basedata
 
 let build_named_lts order transitions flush_mark =
 let open Node in
@@ -241,5 +241,3 @@ let _ =
   let lts_broken = Lts.add_transition lts "0" (Node.NamedNode "r0") (Node.NamedNode ("r1")) 
   in
   model_check ~v_lvl:V.Info formula lts;
-  print_endline "\n";
-  model_check ~v_lvl:V.Info formula lts_broken;

@@ -1,8 +1,8 @@
 (* For high-level info about public functions see lts.mli *)
 open Tcsbasedata
 open Tcsset
-open Datastructures
-
+open Basedata
+open Tools
 
 type transkey =
 (* type to distinguish if transition map contains e.g. p pred or p succ *)
@@ -31,6 +31,7 @@ module TransitionMap = struct
   type t = (transkey, NodeMap.t) TreeMap.t
 
   let empty = TreeMap.empty compare
+
 
   let get_tpredecessors_of_node tm trans node =
   (* returns predecessors of some node for transition trans. 
@@ -68,6 +69,13 @@ module TransitionMap = struct
     let t_initialized_tm = init_transition tm t in
     TreeMap.add (TransIn t) (NodeMap.add_node_to_value (TreeMap.find (TransIn t) t_initialized_tm) to_node from_node) 
                 (TreeMap.add (TransOut t) (NodeMap.add_node_to_value (TreeMap.find (TransOut t) t_initialized_tm) from_node to_node) t_initialized_tm)
+  
+  let turn_transitions tm =
+    TreeMap.mapi (fun key value -> 
+                    match key with
+                      TransIn t -> TreeMap.find (TransOut t) tm
+                    | TransOut t -> TreeMap.find (TransIn t) tm
+                  ) tm
 end
 
 type propkeys = string
@@ -167,34 +175,8 @@ let make_simple lts =
   );
   {nodes = new_nodes; propositions = new_propmap; transitions = new_trans_map}
 
-let range a b =
-(* SEE https://ocaml.org/learn/tutorials/99problems.html*)
-  let rec aux a b =
-    if a > b then [] else a :: aux (a+1) b  in
-  if a > b then List.rev (aux b a) else aux a b
-
-let rand_select list n =
-(* SEE https://ocaml.org/learn/tutorials/99problems.html*)
-  let rec extract acc n = function
-    | [] -> raise Not_found
-    | h :: t -> if n = 0 then (h, acc @ t) else extract (h::acc) (n-1) t
-  in
-  let extract_rand list len =
-    extract [] (Random.int len) list
-  in
-  let rec aux n acc list len =
-    if n = 0 then acc else
-      let picked, rest = extract_rand list len in
-      aux (n-1) (picked :: acc) rest (len-1)
-  in
-  let len = List.length list in
-  aux (min n len) [] list len
-
-let rec all_pairs list =
-(*returns list of all pairs of elements in list.*)
-  match list with
-    | [] -> []
-    | h :: tl -> (h,h) :: (List.map (fun i -> (h,i)) tl) @ (List.map (fun i -> (i,h)) tl) @ all_pairs tl
+let turn_transitions lts =
+  {nodes = lts.nodes; propositions = lts.propositions; transitions = (TransitionMap.turn_transitions lts.transitions)}
 
 let create_random node_count trans_as_string_list props_as_string_list edge_load prop_load =
   let lts = ref (create_dummy node_count) in
