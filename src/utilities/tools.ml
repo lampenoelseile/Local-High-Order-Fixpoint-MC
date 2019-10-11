@@ -27,5 +27,16 @@ let rec all_pairs list =
     | [] -> []
     | h :: tl -> (h,h) :: (List.map (fun i -> (h,i)) tl) @ (List.map (fun i -> (i,h)) tl) @ all_pairs tl
 
-let needed_bits pos_integer = 
-  (int_of_float((log (pos_integer*.1.0)) /. (log 2.0))) + 1
+let num_needed_bits int_value =
+  if int_value < 0 then invalid_arg "num_needed_bits"
+  else
+    (int_of_float((log ((float) int_value)) /. (log 2.0))) + 1
+
+let int_to_binary_list int_value = (*HSB first*)
+  if int_value < 0 then invalid_arg "bin_of_int" else
+  if int_value = 0 then [0] else
+  let rec aux acc d =
+    if d = 0 then acc else
+    aux ((d land 1) :: acc) (d lsr 1)
+  in
+  aux [] int_value
