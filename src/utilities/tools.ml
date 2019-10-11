@@ -26,3 +26,6 @@ let rec all_pairs list =
   match list with
     | [] -> []
     | h :: tl -> (h,h) :: (List.map (fun i -> (h,i)) tl) @ (List.map (fun i -> (i,h)) tl) @ all_pairs tl
+
+let needed_bits pos_integer = 
+  (int_of_float((log (pos_integer*.1.0)) /. (log 2.0))) + 1
