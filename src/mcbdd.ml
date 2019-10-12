@@ -37,7 +37,7 @@ module Semantics = struct
 end
 let model_check formula lts arguments environment v_lvl indent =
   let rec model_check' form lts args env v_lvl ind =
-    match formula with
+    match form with
       F.Const(b) -> if b then 
                       (MLBDD.dtrue (Bddlts.get_man lts), env)
                     else
@@ -59,15 +59,32 @@ let model_check formula lts arguments environment v_lvl indent =
                               let (bdd2,env2) = model_check' phi2 lts args env1 v_lvl ind in
                               (MLBDD.eq bdd1 bdd2, env)
     | F.Diamond(trans, phi) ->  let (bdd,env) = model_check' phi lts args env v_lvl ind in
-                                (Bddlts.get_prop lts "p",environment)
-    | F.Box(trans, phi) -> (Bddlts.get_prop lts "p",environment)
-    | F.Mu(var,var_t,phi) -> (Bddlts.get_prop lts "p",environment)
-    | F.Nu(var,var_t,phi) -> (Bddlts.get_prop lts "p",environment) 
-    | F.Lambda(var,var_t,phi) -> (Bddlts.get_prop lts "p",environment)
-    | F.App(phi1, phi2) -> (Bddlts.get_prop lts "p",environment)
+                                (
+                                  MLBDD.exists 
+                                    (Bddlts.get_tovars_support lts)
+                                    (MLBDD.dand 
+                                      (Bddlts.get_trans lts trans) 
+                                      (MLBDD.permute (Bddlts.get_tovars_ids_as_array lts) bdd)
+                                    ), (*TODO encapsulate into bddlts*)
+                                  environment
+                                )
+    | F.Box(trans, phi) -> let (bdd,env) = model_check' phi lts args env v_lvl ind in
+                                (
+                                  MLBDD.forall 
+                                    (Bddlts.get_tovars_support lts)
+                                    (MLBDD.dand 
+                                      (Bddlts.get_trans lts trans) 
+                                      (MLBDD.permute (Bddlts.get_tovars_ids_as_array lts) bdd)
+                                    ), (*TODO encapsulate into bddlts*)
+                                  environment
+                                )
+  | F.Mu(var,var_t,phi) -> (Bddlts.get_prop lts "p",environment)
+  | F.Nu(var,var_t,phi) -> (Bddlts.get_prop lts "p",environment) 
+  | F.Lambda(var,var_t,phi) -> (Bddlts.get_prop lts "p",environment)
+  | F.App(phi1, phi2) -> (Bddlts.get_prop lts "p",environment)
   in 
   let (bdd,_) = model_check' formula lts arguments environment v_lvl indent in
-  true
+  Bddlts.get_sat_states lts bdd
 
 let model_check ?(v_lvl=V.Info) formula lts =
   V.console_out V.Info v_lvl (fun () -> "MODEL CHECKER INPUT:");
@@ -77,6 +94,6 @@ let model_check ?(v_lvl=V.Info) formula lts =
   let start_time = Unix.gettimeofday () in
   let value = model_check formula lts [] () v_lvl "  " in
   let end_time = Unix.gettimeofday () in 
-  V.console_out V.Info v_lvl (fun () -> "RESULT: " ^ string_of_bool value);
+  V.console_out V.Info v_lvl (fun () -> "RESULT: " ^ Tools.list_to_string value string_of_int);
   V.duration_out V.Info v_lvl start_time end_time "";
   value

@@ -64,7 +64,7 @@ let bdd_fom_bin_rep list_vars list_bin = (*size of list_bin has to be <= than si
     (h_v::t_v, h_b::t_b) -> build (if h_b == 1 then h_v else MLBDD.dnot h_v) t_v t_b 
   | _ -> assert false
 
-let add_proposition lts proposition node = (*BaseVarsTo needed for quantification purposes *)
+let add_proposition lts proposition node = 
   let binary_rep = Tools.int_to_binary_list node in
   if TreeMap.mem proposition lts.propositions then
     let prop_bdd = TreeMap.find proposition lts.propositions in
@@ -79,7 +79,7 @@ let add_proposition lts proposition node = (*BaseVarsTo needed for quantificatio
       ord1varsIDs = lts.ord1varsIDs;
       propositions =  TreeMap.add 
                         proposition
-                        (MLBDD.dor prop_bdd (bdd_fom_bin_rep lts.basevarsTo binary_rep))
+                        (MLBDD.dor prop_bdd (bdd_fom_bin_rep lts.basevars binary_rep))
                         lts.propositions;
       transitions = lts.transitions
     }
@@ -95,7 +95,7 @@ let add_proposition lts proposition node = (*BaseVarsTo needed for quantificatio
       ord1varsIDs = lts.ord1varsIDs;
       propositions =  TreeMap.add 
                         proposition
-                        (bdd_fom_bin_rep lts.basevarsTo binary_rep)
+                        (bdd_fom_bin_rep lts.basevars binary_rep)
                         lts.propositions;
       transitions = lts.transitions
     }
@@ -165,6 +165,9 @@ let get_trans lts transition =
 let get_tovars_support lts = 
   lts.basevarsToSupport
 
+let get_tovars_ids_as_array lts =
+  Array.of_list lts.basevarsToIDs
+
 let basesat_to_int sat =
   let bit_length = (List.length sat)-1 in
   let value = ref 0 in 
@@ -193,12 +196,27 @@ let complete_sat_list sat_list compl_vars_list = (*To get all nodes from satisfa
 
 let get_tovars lts =
   lts.basevarsTo
+
+let get_sat_states lts bdd =
+  List.fold_right 
+    (fun sat list ->
+      (basesat_to_int sat) :: list
+    )
+    (
+      List.fold_left
+        (fun list sat ->
+          list @ (complete_sat_list sat lts.basevarsIDs)
+        )
+      []
+      (MLBDD.allsat bdd)
+    )
+    []
+
 let to_string lts =
   let header = "LABELED TRANSITION SYSTEM\n" in 
   let prop_str =  "propositions\n" ^
                   TreeMap.fold 
                     (fun key value str ->
-                      print_endline (MLBDD.to_string value);
                       str ^ key ^ ": {" ^
                         List.fold_left 
                           (fun str i -> 
@@ -212,7 +230,7 @@ let to_string lts =
                             (
                               List.fold_left
                                 (fun list sat ->
-                                  list @ (complete_sat_list sat lts.basevarsToIDs)
+                                  list @ (complete_sat_list sat lts.basevarsIDs)
                                 )
                               []
                               (MLBDD.allsat value)

@@ -16,4 +16,7 @@ val get_trans : t -> string -> MLBDD.t
 
 val get_tovars_support : t -> MLBDD.support
 
+val get_tovars_ids_as_array : t -> MLBDD.var array
+
+val get_sat_states : t -> MLBDD.t -> node list
 val to_string : t -> string 
