@@ -40,3 +40,18 @@ let int_to_binary_list int_value = (*HSB first*)
     aux ((d land 1) :: acc) (d lsr 1)
   in
   aux [] int_value
+
+let split_list_in_half list =
+  let length = List.length list in
+  if length mod 2 > 0 then
+    invalid_arg "split_list_in_half"
+  else
+    let rec cut first_part id list =
+      match id with
+         0 -> (first_part, list)
+      |  c -> cut (first_part @ [List.hd list]) (id-1) (List.tl list)
+    in 
+    cut [] (length / 2) list
+
+let list_to_string list elem_to_str =
+  (List.fold_left (fun str elem -> str ^ (elem_to_str elem) ^ ",") "[" list) ^ "]"

@@ -16,7 +16,8 @@ let trans =  dor  (dand (dand (dnot var0) (var1)) (dand (war0) war1))
 (dand (dand (dnot var0) (var1)) (dand (dnot war0) war1)))
 
 in
-let lts = Bddlts.add_proposition(Bddlts.add_proposition (create_dummy 10) "p" 2) "p" 7 in
-let lts2 = Bddlts.add_proposition lts "r" 3 in
-  print_endline (MLBDD.to_stringb (TreeMap.find "p" (lts.propositions)));
-  print_endline(Bddlts.to_string lts2)
+let lts = Bddlts.add_proposition(Bddlts.add_proposition (create 11) "p" 2) "p" 10 in
+let lts2 = Bddlts.add_transition (Bddlts.add_transition (Bddlts.add_proposition lts "q" 3) "u" 2 2) "u" 10 3 in
+
+print_endline (Bddlts.to_string lts2);
+print_endline (MLBDD.to_string(MLBDD.exists (Bddlts.get_tovars_support lts2) (MLBDD.dand (Bddlts.get_trans lts2 "u") (Bddlts.get_prop lts2 "p"))))

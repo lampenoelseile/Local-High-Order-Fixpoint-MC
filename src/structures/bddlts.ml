@@ -3,52 +3,50 @@ open Tcsset
 type t = 
   {
     manager: MLBDD.man;                         (*BDD Manager (see MLBDD Library)*)
-    basevarsA: MLBDD.t list;                    (*List of boolean vars, representing states (e.g. 011 represents state 3) - lefttoright -> hightolow!*)
-    basevarsB: MLBDD.t list;                    (*Second of boolean vars, representing states. Needed for transition definition - lefttoright -> hightolow!*)
+    basevars: MLBDD.t list;                     (*List of boolean vars, representing states (e.g. 011 represents state 3) - lefttoright -> hightolow!*)
+    basevarsIDs: int list;
+    basevarsTo: MLBDD.t list;                   (*Second of boolean vars, representing states. Needed for transition definition - lefttoright -> hightolow!*)
+    basevarsToIDs: int list;
+    basevarsToSupport: MLBDD.support;           (*Needed for quantification in modal cases.*)
     ord1vars: MLBDD.t list;                     (*List of boolean vars, state sets (e.g. 1010 means state 1 and 3 are included, 2 and 4 not)*)
+    ord1varsIDs: int list;
     propositions: (string,MLBDD.t) TreeMap.t;   (*Map that links a proposition (string) to its BDD representation*)
     transitions: (string,MLBDD.t) TreeMap.t     (*Map that links a transition (string) to its BDD representation*)
   }
 
-let create_empty = 
-  {
-    manager = MLBDD.init(); (*MLBDD default cache size*) (*TODO: What does this size mean?*)
-    basevarsA = [];
-    basevarsB = [];
-    ord1vars = [];
-    propositions = TreeMap.empty(String.compare); 
-    transitions = TreeMap.empty(String.compare)
-  }
+type node = int
 
-
-
-let create_dummy number_of_nodes =
+let create number_of_nodes =
   let number_of_basevars = Tools.num_needed_bits number_of_nodes in
-  let range_of_basevarsA_ids = Tools.range 0 (number_of_basevars-1) in
-  let range_of_basevarsB_ids = Tools.range number_of_basevars (2*number_of_basevars-1) in
+  let range_of_basevars_ids = Tools.range 0 (number_of_basevars-1) in
+  let range_of_basevarsTo_ids = Tools.range number_of_basevars (2*number_of_basevars-1) in
   let number_of_ord1vars = number_of_nodes in
   let range_of_ord1vars_ids = Tools.range (2*number_of_basevars) ((2*number_of_basevars)+number_of_ord1vars-1) in
   let man = MLBDD.init() in
   {
     manager = man;
-    basevarsA =  List.fold_right 
+    basevars =  List.fold_right 
                   (fun basevar_id  list_of_basevars -> 
                     (MLBDD.ithvar man basevar_id) :: list_of_basevars
                   )
-                  range_of_basevarsA_ids
+                  range_of_basevars_ids
                   [];
-    basevarsB = List.fold_right 
+    basevarsIDs = range_of_basevars_ids;
+    basevarsTo = List.fold_right 
                   (fun basevar_id  list_of_basevars -> 
                     (MLBDD.ithvar man basevar_id) :: list_of_basevars
                   )
-                  range_of_basevarsB_ids
+                  range_of_basevarsTo_ids
                   [];
+    basevarsToIDs = range_of_basevarsTo_ids;
+    basevarsToSupport = MLBDD.support_of_list range_of_basevarsTo_ids;
     ord1vars =  List.fold_right 
                   (fun ord1var_id list_of_ord1vars -> 
                     (MLBDD.ithvar man ord1var_id) :: list_of_ord1vars
                   )
                   range_of_ord1vars_ids
                   [];
+    ord1varsIDs = range_of_ord1vars_ids;
     propositions = TreeMap.empty (String.compare);
     transitions = TreeMap.empty (String.compare);
   }
@@ -63,33 +61,41 @@ let bdd_fom_bin_rep list_vars list_bin = (*size of list_bin has to be <= than si
   in
 
   match (List.rev(list_vars),List.rev(list_bin)) with
-    (h_v::t_v, h_b::t_b) -> build (if h_b == 1 then h_v else MLBDD.dnot h_v) t_v t_b
+    (h_v::t_v, h_b::t_b) -> build (if h_b == 1 then h_v else MLBDD.dnot h_v) t_v t_b 
   | _ -> assert false
 
-let add_proposition lts proposition node =
+let add_proposition lts proposition node = (*BaseVarsTo needed for quantification purposes *)
   let binary_rep = Tools.int_to_binary_list node in
   if TreeMap.mem proposition lts.propositions then
     let prop_bdd = TreeMap.find proposition lts.propositions in
     { 
       manager = lts.manager;
-      basevarsA = lts.basevarsA;
-      basevarsB = lts.basevarsB;
+      basevars = lts.basevars;
+      basevarsIDs = lts.basevarsIDs;
+      basevarsTo = lts.basevarsTo;
+      basevarsToIDs = lts.basevarsToIDs;
+      basevarsToSupport = lts.basevarsToSupport;
       ord1vars = lts.ord1vars;
+      ord1varsIDs = lts.ord1varsIDs;
       propositions =  TreeMap.add 
                         proposition
-                        (MLBDD.dor prop_bdd (bdd_fom_bin_rep lts.basevarsA binary_rep))
+                        (MLBDD.dor prop_bdd (bdd_fom_bin_rep lts.basevarsTo binary_rep))
                         lts.propositions;
       transitions = lts.transitions
     }
   else
     { 
       manager = lts.manager;
-      basevarsA = lts.basevarsA;
-      basevarsB = lts.basevarsB;
+      basevars = lts.basevars;
+      basevarsIDs = lts.basevarsIDs;
+      basevarsTo = lts.basevarsTo;
+      basevarsToIDs = lts.basevarsToIDs;
+      basevarsToSupport = lts.basevarsToSupport;
       ord1vars = lts.ord1vars;
+      ord1varsIDs = lts.ord1varsIDs;
       propositions =  TreeMap.add 
                         proposition
-                        (bdd_fom_bin_rep lts.basevarsA binary_rep)
+                        (bdd_fom_bin_rep lts.basevarsTo binary_rep)
                         lts.propositions;
       transitions = lts.transitions
     }
@@ -102,17 +108,21 @@ let add_transition lts transition from_node to_node =
     let trans_bdd = TreeMap.find transition lts.transitions in
     {
       manager = lts.manager;
-      basevarsA = lts.basevarsA;
-      basevarsB = lts.basevarsB;
+      basevars = lts.basevars;
+      basevarsIDs = lts.basevarsIDs;
+      basevarsTo = lts.basevarsTo;
+      basevarsToIDs = lts.basevarsToIDs;
+      basevarsToSupport = lts.basevarsToSupport;
       ord1vars = lts.ord1vars;
+      ord1varsIDs = lts.ord1varsIDs;
       propositions = lts.propositions;
       transitions = TreeMap.add
                       transition
                       (MLBDD.dor 
                         trans_bdd 
                         (MLBDD.dand 
-                          (bdd_fom_bin_rep lts.basevarsA binary_rep_from_node)
-                          (bdd_fom_bin_rep lts.basevarsB binary_rep_to_node)
+                          (bdd_fom_bin_rep lts.basevars binary_rep_from_node)
+                          (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_node)
                         )
                       )
                       lts.transitions
@@ -120,60 +130,123 @@ let add_transition lts transition from_node to_node =
   else
     {
       manager = lts.manager;
-      basevarsA = lts.basevarsA;
-      basevarsB = lts.basevarsB;
+      basevars = lts.basevars;
+      basevarsIDs = lts.basevarsIDs;
+      basevarsTo = lts.basevarsTo;
+      basevarsToIDs = lts.basevarsToIDs;
+      basevarsToSupport = lts.basevarsToSupport;
       ord1vars = lts.ord1vars;
+      ord1varsIDs = lts.ord1varsIDs;
       propositions = lts.propositions;
       transitions = TreeMap.add
                       transition
                       (MLBDD.dand 
-                        (bdd_fom_bin_rep lts.basevarsA binary_rep_from_node)
-                        (bdd_fom_bin_rep lts.basevarsB binary_rep_to_node)
+                        (bdd_fom_bin_rep lts.basevars binary_rep_from_node)
+                        (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_node)
                       )
                       lts.transitions
     }
-let basesats_to_ints sats_list =
-  List.fold_left 
-    (fun list sat ->
-      let bit_length = (List.length sat)-1 in
-      (List.fold_left 
-        (fun value assignment ->
-          let (bool_val,var_id) = assignment in
-          let bit = bit_length - var_id in
-          value + (if bool_val then int_of_float (2.0**((float)bit)) else 0)
-        )
-      0
-      sat) :: list
-    )
-    []
-    sats_list
 
+let get_man lts =
+  lts.manager 
+
+let get_prop lts proposition =
+  if TreeMap.mem proposition lts.propositions then 
+    TreeMap.find proposition lts.propositions
+  else
+    invalid_arg "get_prop"
+
+let get_trans lts transition =
+  if TreeMap.mem transition lts.transitions then 
+    TreeMap.find transition lts.transitions
+  else
+    invalid_arg "get_prop"
+
+let get_tovars_support lts = 
+  lts.basevarsToSupport
+
+let basesat_to_int sat =
+  let bit_length = (List.length sat)-1 in
+  let value = ref 0 in 
+  List.iteri
+    (fun id assignment ->
+      let (bool_val,_) = assignment in
+      let bit = bit_length - id in
+      value :=  !value 
+                + (if bool_val then int_of_float (2.0**((float)bit)) else 0)
+    )
+    sat;
+  !value
+
+let complete_sat_list sat_list compl_vars_list = (*To get all nodes from satisfactories, even if bdd is simpliefied / reduced*)
+  let rec complete list part_l comp_l =
+    match (part_l,comp_l) with 
+      (hp::tp,hc::tc) ->  let (boolp,varp) = hp in 
+                            if varp = hc then (complete (list @ [hp]) tp tc)
+                            else (complete (list @ [(true,hc)]) part_l tc) @ (complete (list @ [(false,hc)]) part_l tc)                   
+    | ([], hc::tc) -> (complete (list @ [(true,hc)]) part_l tc) @ (complete (list @ [(false,hc)]) part_l tc)
+    | ([],[]) -> [list]
+    | _ -> assert false
+  in
+  complete [] sat_list compl_vars_list
+
+
+let get_tovars lts =
+  lts.basevarsTo
 let to_string lts =
   let header = "LABELED TRANSITION SYSTEM\n" in 
   let prop_str =  "propositions\n" ^
                   TreeMap.fold 
                     (fun key value str ->
+                      print_endline (MLBDD.to_string value);
                       str ^ key ^ ": {" ^
                         List.fold_left 
                           (fun str i -> 
                             str ^ (string_of_int i) ^ ","
                           ) 
                           "" 
-                          (basesats_to_ints (MLBDD.allsat value)) 
+                          (List.fold_right 
+                            (fun sat list ->
+                              (basesat_to_int sat) :: list
+                            )
+                            (
+                              List.fold_left
+                                (fun list sat ->
+                                  list @ (complete_sat_list sat lts.basevarsToIDs)
+                                )
+                              []
+                              (MLBDD.allsat value)
+                            )
+                            []
+                          ) 
                       ^ "}\n"
                     ) 
                     lts.propositions
                     ""
   in
-  let trans_str = "transitions" ^
+  let trans_str = "transitions\n" ^
                   TreeMap.fold
                     (fun key value str ->
-                      ""
+                      str ^ List.fold_left
+                              (fun str sat ->
+                                let (from_sat,to_sat) = Tools.split_list_in_half sat in
+                                str ^ (string_of_int (basesat_to_int from_sat)) ^ " --" ^ key ^"--> " 
+                                ^ string_of_int (basesat_to_int to_sat) ^ "\n"
+                              )
+                              ""
+                              (
+                              List.fold_left
+                                (fun list sat ->
+                                  list @ (complete_sat_list sat (lts.basevarsIDs @ lts.basevarsToIDs))
+                                )
+                              []
+                              (MLBDD.allsat value)
+                            )
                     )
                     lts.transitions
                     ""
   in
-  header ^ prop_str
+  header ^ prop_str ^ trans_str
   
   (*let to_string lts =
   let string_rep = ref "" in
