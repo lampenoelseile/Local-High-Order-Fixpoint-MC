@@ -156,7 +156,7 @@ module Semantics = struct
     [] -> empty_fun
     | h :: t -> let (arg,value) = h in set_value_for_args value (from_list_of_pairs t) [arg]
   
-    let rec get_defined_arguments = function
+  let rec get_defined_arguments = function
     Base(ns) -> [[]]
   | Fun(map) -> if TreeMap.is_empty map then []
                 else begin

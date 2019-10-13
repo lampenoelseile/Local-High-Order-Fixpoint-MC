@@ -53,5 +53,9 @@ let split_list_in_half list =
     in 
     cut [] (length / 2) list
 
+let strip_last_char str =
+  if str = "" then "" else
+    String.sub str 0 ((String.length str) - 1)
+
 let list_to_string list elem_to_str =
-  (List.fold_left (fun str elem -> str ^ (elem_to_str elem) ^ ",") "[" list) ^ "]"
+  strip_last_char (List.fold_left (fun str elem -> str ^ (elem_to_str elem) ^ ",") "[" list) ^ "]"

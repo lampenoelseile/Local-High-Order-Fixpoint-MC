@@ -12,4 +12,6 @@ val int_to_binary_list : int -> int list
 
 val split_list_in_half : 'a list -> ('a list * 'a list)
 
+val strip_last_char : string -> string
+
 val list_to_string : 'a list -> ('a -> string) -> string
