@@ -1,4 +1,5 @@
 open Tcsset 
+open Hfl
 
 type t
 
@@ -26,21 +27,24 @@ val does_satisfy : t -> MLBDD.t -> state -> bool
 
 val to_string : t -> string 
 
-(*module HO : sig
-  type base = MLBDD.t
+module HO : sig
+  type hot =
+    Base of MLBDD.t
+  | Fun of (hot,hot) TreeMap.t
 
-  type map = 
-    MapBase of base
-  | MapFun of (map,map) TreeMap.t
+  val compare : hot -> hot -> int
+  val empty_base : t -> hot
+  val empty_fun : hot
 
-  type t =
-    Base of base
-  | Map of map
-  | Ref of (t -> t)
+  val to_string : ?max_length:int -> hot -> string
 
-  val get_value : t -> t list -> t
+  val is_defined_for_args : hot -> hot list -> bool
 
-  val of_bdd : MLBDD.t -> t
+  val get_value_for_args : hot -> hot list -> hot
+  
+  val set_value_for_args : hot -> hot -> hot list -> hot
 
-  val to_bdd : t -> MLBDD.t
-end*)
+  val get_defined_arguments : hot -> (hot list) list
+
+  val all_of_type : t -> Formula.variable_t -> hot list
+end

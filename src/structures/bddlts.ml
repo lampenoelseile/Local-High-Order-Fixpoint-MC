@@ -1,4 +1,5 @@
 open Tcsset
+open Hfl
 
 type t = 
   {
@@ -8,48 +9,12 @@ type t =
     basevarsTo: MLBDD.t list;                   (*Second of boolean vars, representing states. Needed for transition definition - lefttoright -> hightolow!*)
     basevarsToIDs: int list;
     basevarsToSupport: MLBDD.support;           (*Needed for quantification in modal cases.*)
-    ord1vars: MLBDD.t list;                     (*List of boolean vars, state sets (e.g. 1010 means state 1 and 3 are included, 2 and 4 not)*)
-    ord1varsIDs: int list;
     propositions: (string,MLBDD.t) TreeMap.t;   (*Map that links a proposition (string) to its BDD representation*)
-    transitions: (string,MLBDD.t) TreeMap.t     (*Map that links a transition (string) to its BDD representation*)
+    transitions: (string,MLBDD.t) TreeMap.t;    (*Map that links a transition (string) to its BDD representation*)
+    statescoded: MLBDD.t list
   }
 
 type state = int
-
-let create number_of_states =
-  let number_of_basevars = Tools.num_needed_bits number_of_states in
-  let range_of_basevars_ids = Tools.range 0 (number_of_basevars-1) in
-  let range_of_basevarsTo_ids = Tools.range number_of_basevars (2*number_of_basevars-1) in
-  let number_of_ord1vars = number_of_states in
-  let range_of_ord1vars_ids = Tools.range (2*number_of_basevars) ((2*number_of_basevars)+number_of_ord1vars-1) in
-  let man = MLBDD.init() in
-  {
-    manager = man;
-    basevars =  List.fold_right 
-                  (fun basevar_id  list_of_basevars -> 
-                    (MLBDD.ithvar man basevar_id) :: list_of_basevars
-                  )
-                  range_of_basevars_ids
-                  [];
-    basevarsIDs = range_of_basevars_ids;
-    basevarsTo = List.fold_right 
-                  (fun basevar_id  list_of_basevars -> 
-                    (MLBDD.ithvar man basevar_id) :: list_of_basevars
-                  )
-                  range_of_basevarsTo_ids
-                  [];
-    basevarsToIDs = range_of_basevarsTo_ids;
-    basevarsToSupport = MLBDD.support_of_list range_of_basevarsTo_ids;
-    ord1vars =  List.fold_right 
-                  (fun ord1var_id list_of_ord1vars -> 
-                    (MLBDD.ithvar man ord1var_id) :: list_of_ord1vars
-                  )
-                  range_of_ord1vars_ids
-                  [];
-    ord1varsIDs = range_of_ord1vars_ids;
-    propositions = TreeMap.empty (String.compare);
-    transitions = TreeMap.empty (String.compare);
-  }
 
 let bdd_fom_bin_rep list_vars list_bin = (*size of list_bin has to be <= than size of list_vars!*)
   let rec build bdd vars bins =          (*Expects list_vars low_id to high_id and list_bin high_bit to low_bit*)
@@ -59,10 +24,45 @@ let bdd_fom_bin_rep list_vars list_bin = (*size of list_bin has to be <= than si
     | ([],h_b::t_b) -> invalid_arg "bdd_from_bin_rep"
     | (h_v::t_v,h_b::t_b) -> build (MLBDD.dand bdd (if h_b = 1 then h_v else MLBDD.dnot h_v)) t_v t_b
   in
-
   match (List.rev(list_vars),List.rev(list_bin)) with
     (h_v::t_v, h_b::t_b) -> build (if h_b = 1 then h_v else MLBDD.dnot h_v) t_v t_b 
   | _ -> assert false
+
+let create number_of_states =
+  let number_of_basevars = Tools.num_needed_bits number_of_states in
+  let range_of_basevars_ids = Tools.range 0 (number_of_basevars-1) in
+  let range_of_basevarsTo_ids = Tools.range number_of_basevars (2*number_of_basevars-1) in
+  let man = MLBDD.init() in
+  let basevars = List.fold_right 
+                  (fun basevar_id  list_of_basevars -> 
+                    (MLBDD.ithvar man basevar_id) :: list_of_basevars
+                  )
+                  range_of_basevars_ids
+                  [];
+  in
+  let basevarsTo = List.fold_right 
+                  (fun basevar_id  list_of_basevars -> 
+                    (MLBDD.ithvar man basevar_id) :: list_of_basevars
+                  )
+                  range_of_basevarsTo_ids
+                  [];
+  in
+  {
+    manager = man;
+    basevars =  basevars;
+    basevarsIDs = range_of_basevars_ids;
+    basevarsTo = basevarsTo;
+    basevarsToIDs = range_of_basevarsTo_ids;
+    basevarsToSupport = MLBDD.support_of_list range_of_basevarsTo_ids;
+    propositions = TreeMap.empty (String.compare);
+    transitions = TreeMap.empty (String.compare);
+    statescoded = List.fold_left
+                    (fun code_list state -> 
+                      bdd_fom_bin_rep basevars (Tools.int_to_binary_list state) :: code_list
+                    )
+                    []
+                    (Tools.range 0 (number_of_states-1))
+  }
 
 let add_proposition lts proposition state = 
   let binary_rep = Tools.int_to_binary_list state in
@@ -75,13 +75,12 @@ let add_proposition lts proposition state =
       basevarsTo = lts.basevarsTo;
       basevarsToIDs = lts.basevarsToIDs;
       basevarsToSupport = lts.basevarsToSupport;
-      ord1vars = lts.ord1vars;
-      ord1varsIDs = lts.ord1varsIDs;
       propositions =  TreeMap.add 
                         proposition
                         (MLBDD.dor prop_bdd (bdd_fom_bin_rep lts.basevars binary_rep))
                         lts.propositions;
-      transitions = lts.transitions
+      transitions = lts.transitions;
+      statescoded = lts.statescoded
     }
   else
     { 
@@ -91,13 +90,12 @@ let add_proposition lts proposition state =
       basevarsTo = lts.basevarsTo;
       basevarsToIDs = lts.basevarsToIDs;
       basevarsToSupport = lts.basevarsToSupport;
-      ord1vars = lts.ord1vars;
-      ord1varsIDs = lts.ord1varsIDs;
       propositions =  TreeMap.add 
                         proposition
                         (bdd_fom_bin_rep lts.basevars binary_rep)
                         lts.propositions;
-      transitions = lts.transitions
+      transitions = lts.transitions;
+      statescoded = lts.statescoded
     }
 
 let add_transition lts transition from_state to_state =
@@ -113,8 +111,6 @@ let add_transition lts transition from_state to_state =
       basevarsTo = lts.basevarsTo;
       basevarsToIDs = lts.basevarsToIDs;
       basevarsToSupport = lts.basevarsToSupport;
-      ord1vars = lts.ord1vars;
-      ord1varsIDs = lts.ord1varsIDs;
       propositions = lts.propositions;
       transitions = TreeMap.add
                       transition
@@ -125,7 +121,8 @@ let add_transition lts transition from_state to_state =
                           (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
                         )
                       )
-                      lts.transitions
+                      lts.transitions;
+      statescoded = lts.statescoded
     }
   else
     {
@@ -135,8 +132,6 @@ let add_transition lts transition from_state to_state =
       basevarsTo = lts.basevarsTo;
       basevarsToIDs = lts.basevarsToIDs;
       basevarsToSupport = lts.basevarsToSupport;
-      ord1vars = lts.ord1vars;
-      ord1varsIDs = lts.ord1varsIDs;
       propositions = lts.propositions;
       transitions = TreeMap.add
                       transition
@@ -144,7 +139,8 @@ let add_transition lts transition from_state to_state =
                         (bdd_fom_bin_rep lts.basevars binary_rep_from_state)
                         (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
                       )
-                      lts.transitions
+                      lts.transitions;
+      statescoded = lts.statescoded
     }
 
 let get_man lts =
@@ -208,7 +204,7 @@ let get_all_sat_states lts bdd = (*TODO: Returns undefined states because of com
     (
       List.fold_left
         (fun list sat ->
-          list @ (complete_sat_list sat lts.basevarsIDs)
+          list @ (List.filter (fun elem -> (basesat_to_int elem) < (List.length lts.statescoded)) (complete_sat_list sat lts.basevarsIDs))
         )
       []
       (MLBDD.allsat bdd)
@@ -270,59 +266,21 @@ let to_string lts =
   in
   header ^ prop_str ^ trans_str
   
- (*module HO = struct
+ module HO = struct
   
-  type base = MLBDD.t
+  type hot =
+    Base of MLBDD.t
+  | Fun of (hot,hot) TreeMap.t
 
-  type refer = 
-    RefBase of MLBDD.t
-  | RefFun of (ref_t -> ref_t)
+  let rec compare = function
+      Base ns_one ->  (function
+                  Base ns_two -> if MLBDD.equal ns_one ns_two then 0 
+                                 else Int.compare (MLBDD.id ns_one) (MLBDD.id ns_two) (*TODO COMPARE EVEN IF REDUCED LOL?! *)
+                  | Fun map -> assert false)
 
-  type map_t = 
-    MapBase of MLBDD.t
-  | MapFun of (map_t,map_t) TreeMap.t
-
-  type t = 
-    Ref of ref_t 
-  | Map of map_t
-
-  let detype_ref = function 
-    Ref ref -> ref
-  | _ -> assert false
-
-  let detype_map = function 
-    Map map -> map
-  | _ -> assert false 
-
-  let get_value hot args =
-    match hot with 
-      Ref ref ->  let rec apply_arg_list hot arglist = (*This gives me goosebumps*)
-                    match (hot,arglist) with 
-                      (RefBase bdd, []) -> hot
-                    | (RefFun f, h::t) -> apply_arg_list (f (detype_ref h)) t
-                    | (RefFun f, []) -> hot
-                    | _ -> assert false 
-                  in
-                  Ref (apply_arg_list ref args)
-    | Map map ->  let rec get_value_for_args = function
-                    | MapBase(b) -> (function
-                                  | [] -> MapBase(b)
-                                  | _ -> assert false)
-                    | MapFun(map) -> (function
-                                  | [] -> assert false
-                                  | h :: [] -> TreeMap.find (detype_map h) map
-                                  | h :: t -> get_value_for_args (TreeMap.find (detype_map h) map) t)
-                  in 
-                  Map (get_value_for_args map args)
-
-  let rec compare_map = function
-      MapBase ns_one ->  (function
-                  MapBase ns_two -> Int.compare (MLBDD.id ns_one) (MLBDD.id ns_two)
-                  | MapFun map -> assert false)
-
-    | MapFun map_one -> (function
-                      MapBase ns_two -> assert false
-                      | MapFun map_two -> let keys_one = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
+    | Fun map_one -> (function
+                        Base ns_two -> assert false
+                      | Fun map_two -> let keys_one = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
                               (TreeMap.to_key_iterator map_one)) in
                               let keys_two = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
                               (TreeMap.to_key_iterator map_two)) in
@@ -340,59 +298,68 @@ let to_string lts =
                               helper keys_one keys_two            
                         )
   
-  let of_bdd bdd = 
-    Ref (RefBase bdd)  (*uff...*)
+  let rec to_string ?(max_length = 200) sem = 
+    match sem with
+    | Base(ns) -> MLBDD.to_string ns
+    | Fun(map) -> let value = 
+                    (TreeMap.fold 
+                      (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") 
+                      map "["
+                    ) 
+                    ^ "]"
+                  in
+                  let val_length = String.length value in
+                  if val_length <= max_length-3 then
+                    value
+                  else
+                  (String.sub value 0 (max_length / 2)) ^ " ... " 
+                  ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
 
-  let to_bdd ho =
-    match ho with 
-      Ref r -> (match r with RefBase r' -> r' | _ -> assert false)
-    | Map m -> (match m with MapBase m' -> m' | _ -> assert false)  
-   
-  let empty_ns lts = 
-    List.fold_left 
+  let empty_base lts = 
+    Base (List.fold_left 
       (fun bdd var ->
         MLBDD.dand bdd (MLBDD.dnot var)
       )
-      (MLBDD.dnot (List.hd lts.ord1vars))
-      (List.tl lts.ord1vars)
+      (MLBDD.dnot (List.hd lts.basevars))
+      (List.tl lts.basevars))
   
-  let empty_fun = MapFun(TreeMap.empty compare_map)
+  let empty_fun = Fun (TreeMap.empty compare)
 
   let rec is_defined_for_args = function
-    | MapBase(ns) -> (function
+    | Base(ns) -> (function
                   | [] -> true
                   | _ ->  assert false)
-    | MapFun(map) -> (function
+    | Fun (map) -> (function
                   | [] -> assert false
                   | h :: [] -> TreeMap.mem h map 
                   | h :: t ->  let value = TreeMap.mem h map in
                                 value && is_defined_for_args (TreeMap.find h map) t)
 
   let rec get_value_for_args = function
-    | MapBase(ns) -> (function
-                  | [] -> MapBase(ns)
+    | Base(ns) -> (function
+                  | [] -> Base(ns)
                   | _ -> assert false)
-    | MapFun(map) -> (function
+    | Fun(map) -> (function
                   | [] -> assert false
                   | h :: [] -> TreeMap.find h map
                   | h :: t -> get_value_for_args (TreeMap.find h map) t)
 
   let rec set_value_for_args value = function
-    | MapBase(ns) -> (function
+    | Base(ns) -> (function
                     | [] -> value
                     | _ ->  assert false)
-    | MapFun(map) ->  (function
+    | Fun(map) ->  (function
                     | [] ->  assert false
-                    | h :: [] -> MapFun(TreeMap.add h value map)
-                    | h :: t -> if is_defined_for_args (MapFun map) [h] then
-                                  MapFun(TreeMap.add h (set_value_for_args value (TreeMap.find h map) t) map)
+                    | h :: [] -> Fun(TreeMap.add h value map)
+                    | h :: t -> if is_defined_for_args (Fun map) [h] then
+                                  Fun(TreeMap.add h (set_value_for_args value (TreeMap.find h map) t) map)
                                 else
                                   let new_map = empty_fun in 
-                                  MapFun(TreeMap.add h (set_value_for_args value new_map t) map))
+                                  Fun(TreeMap.add h (set_value_for_args value new_map t) map))
   
   let rec get_defined_arguments = function
-    MapBase(ns) -> [[]]
-  | MapFun(map) -> if TreeMap.is_empty map then []
+    Base(ns) -> [[]]
+  | Fun(map) -> if TreeMap.is_empty map then []
                 else begin
                   let args = Tcsbasedata.Iterators.to_list 
                               (TreeMap.to_key_iterator map) 
@@ -401,11 +368,41 @@ let to_string lts =
                     (fun list arg ->
                       (List.map 
                         (fun arg_list -> arg :: arg_list) 
-                        (get_defined_arguments (get_value_for_args (MapFun map) [arg]))
+                        (get_defined_arguments (get_value_for_args (Fun map) [arg]))
                       ) 
                       @ list
                     ) 
                     [] 
                     args
                 end
-end*)
+  
+  let rec from_list_of_pairs = function
+    [] -> empty_fun
+    | h :: t -> let (arg,value) = h in set_value_for_args value (from_list_of_pairs t) [arg]
+
+  let rec all_of_type lts = function
+      Formula.Base ->   let comp_base_bdd bdd1 bdd2 =
+                          Int.compare (MLBDD.hash bdd1) (MLBDD.hash bdd2)
+                        in
+                        TreeSet.fold_subsets
+                          (fun sub bdd_list -> 
+                            Base(TreeSet.fold
+                              (fun elem bdd -> 
+                                MLBDD.dor elem bdd
+                              )
+                              sub
+                              (MLBDD.dfalse lts.manager)) :: bdd_list)
+                          (TreeSet.of_list comp_base_bdd lts.statescoded)
+                          []
+                          
+
+    | Formula.Fun(arg_t, val_t) -> let all_arguments = all_of_type lts arg_t in
+                                   let all_values = all_of_type lts val_t in
+                                   let rec helper arguments values pairs =
+                                    match arguments with
+                                      | [] -> []
+                                      | h :: [] -> List.fold_left (fun val_sems value -> (from_list_of_pairs ((h,value)::pairs)) :: val_sems) [] values
+                                      | h :: t -> List.fold_left (fun val_sems value -> val_sems @ (helper t values ((h, value) :: pairs))) [] values
+                                   in
+                                   helper (all_arguments) (all_values) [] (* TODO explain *)
+end
