@@ -316,12 +316,10 @@ let to_string lts =
                   ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
 
   let empty_base lts = 
-    Base (List.fold_left 
-      (fun bdd var ->
-        MLBDD.dand bdd (MLBDD.dnot var)
-      )
-      (MLBDD.dnot (List.hd lts.basevars))
-      (List.tl lts.basevars))
+    Base (MLBDD.dfalse lts.manager)
+  
+  let full_base lts =
+    Base (MLBDD.dtrue lts.manager)
   
   let empty_fun = Fun (TreeMap.empty compare)
 

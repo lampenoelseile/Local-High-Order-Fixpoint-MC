@@ -62,8 +62,16 @@ let model_check formula lts arguments environment v_lvl indent =
                         end else begin
                           match fp_t with 
                             F.NoFP -> assert false 
-                          | F.LFP ->  assert false
-                          | F.GFP ->  assert false
+                          | F.LFP ->  let empty_base = HO.empty_base lts in
+                                      (
+                                        empty_base, 
+                                        VarMap.set  (Var(var,var_t,fp_t)) 
+                                          (HO.set_value_for_args (empty_base) current_val args) env)
+                          | F.GFP ->  let full_base = HO.full_base lts in
+                                      (
+                                        full_base, 
+                                        VarMap.set  (Var(var,var_t,fp_t)) 
+                                          (HO.set_value_for_args (full_base) current_val args) env)
                         end                    
     | F.Neg(phi) -> let (bdd,env) = model_check' phi lts args env v_lvl ind in
                     (match bdd with HO.Base bdd -> (HO.Base(MLBDD.dnot bdd), env) | _ -> assert false)
@@ -115,7 +123,8 @@ let model_check formula lts arguments environment v_lvl indent =
                                           env
                                         )
                               | _ -> assert false)
-  | F.Mu(var,var_t,phi) ->  (*let x = F.Var(var,var_t,LFP) in
+
+  | F.Mu(var,var_t,phi) ->  let x = F.Var(var,var_t,LFP) in
                             let rec repeat_until map =
                               (*repeat until approximation is found (i.e. fixpoint) 
                                 returns env including fp approximation for x.
@@ -123,64 +132,96 @@ let model_check formula lts arguments environment v_lvl indent =
                               let start_time = Unix.gettimeofday () in
                               let update = ref 
                                 (match var_t with 
-                                  F.Base -> HO.empty_base lts | _ -> HO.empty_fun lts) 
+                                  F.Base -> HO.empty_base lts | _ -> HO.empty_fun) 
                               in
-                              let defined_args = (S.get_defined_arguments (VarMap.get ~v_lvl x map)) in
+                              let defined_args = (HO.get_defined_arguments (VarMap.get x map)) in
                               List.iter
                                 (*for each argument list*) 
                                 (fun arg_list ->
-                                    V.console_out V.Detailed v_lvl 
-                                      (fun () -> indent ^ "  " ^ "LFP Arg: [" 
-                                        ^ List.fold_left (fun str arg -> str ^ S.to_string arg ^ ";") 
-                                    "" arg_list ^ "]");
                                   let (value, env_tmp) = 
-                                    model_check phi lts arg_list map v_lvl (indent ^ "   " ^ "  ")
+                                    model_check' phi lts arg_list map v_lvl (indent)
                                     (*value and (updated env) of approx for current argument*) 
                                   in
-                                  let defined_args_tmp = S.get_defined_arguments (VarMap.get ~v_lvl x env_tmp) in
+                                  let defined_args_tmp = HO.get_defined_arguments (VarMap.get x env_tmp) in
                                     List.iter (*add new arguments to update, which occured first time in this iteration*) 
                                     (fun arg_list_tmp -> 
                                       update := 
-                                      S.set_value_for_args 
-                                        (S.get_value_for_args (VarMap.get ~v_lvl x env_tmp) arg_list_tmp) 
+                                      HO.set_value_for_args 
+                                        (HO.get_value_for_args (VarMap.get x env_tmp) arg_list_tmp) 
                                         !update arg_list_tmp
                                     ) 
                                   (List.filter (fun x -> not (List.mem x defined_args)) defined_args_tmp);
-                                  update := S.set_value_for_args (S.Base value) !update arg_list
+                                  update := HO.set_value_for_args (value) !update arg_list
                                 ) 
                                 defined_args;
-                              if S.compare !update (VarMap.get ~v_lvl x map) == 0 then
+                              if HO.compare !update (VarMap.get x map) == 0 then
                               begin (*last and second to last iteration are equal *)
-                                let end_time = Unix.gettimeofday () in 
-                                V.console_out V.Detailed v_lvl (fun () -> indent ^ "FP found.");
-                                V.duration_out V.Detailed v_lvl start_time end_time (indent ^ "FP Approx Step - ");
                                 map
                               end else
                               begin (*last and second to last iteration differ *)
                                 let end_time = Unix.gettimeofday () in
-                                V.console_out V.Detailed v_lvl (fun () -> indent ^ "Approximation changed.");
-                                V.duration_out V.Detailed v_lvl start_time end_time (indent ^ "FP Approx Step - ");
-                                repeat_until (VarMap.set ~v_lvl x !update map)
+                                repeat_until (VarMap.set x !update map)
                               end
                             in
-                            let initialized_map = VarMap.set ~v_lvl x 
-                                  (S.set_value_for_args 
-                                    S.empty_base 
-                                    (match var_t with F.Base -> S.empty_base | _ -> S.empty_fun) args) 
+                            let initialized_map = VarMap.set x 
+                                  (HO.set_value_for_args 
+                                    (HO.empty_base lts)
+                                    (match var_t with F.Base -> HO.empty_base lts | _ -> HO.empty_fun) args) 
                                     env 
                             in
-                            let approx = VarMap.get ~v_lvl x (repeat_until initialized_map) in
-                            (match approx with 
-                              S.Base ns -> V.console_out V.Detailed v_lvl 
-                                            (fun () -> "FP - Value:" ^ NodeSet.to_string ns)
-                            | _ -> V.sem_log_out V.Detailed v_lvl approx (F.Mu(var,var_t,phi)));
-
-                            (match S.get_value_for_args approx args with
-                              S.Base ns -> (ns,env)
-                            | S.Fun(map)-> assert false)*)(HO.Base(Bddlts.get_prop lts "p"),env)
+                            let approx = VarMap.get x (repeat_until initialized_map) in
+                            (match HO.get_value_for_args approx args with
+                              HO.Base ns -> (HO.Base ns,env)
+                            | HO.Fun(map)-> assert false)
 
 
-  | F.Nu(var,var_t,phi) -> (HO.Base(Bddlts.get_prop lts "p"),env)
+  | F.Nu(var,var_t,phi) ->  let x = F.Var(var,var_t,GFP) in
+                            let rec repeat_until map =
+                              (*repeat until approximation is found (i.e. fixpoint) 
+                                returns env including fp approximation for x.
+                              *)
+                              let update = ref 
+                                (match var_t with 
+                                  F.Base -> HO.full_base lts | _ -> HO.empty_fun) 
+                              in
+                              let defined_args = (HO.get_defined_arguments (VarMap.get x map)) in
+                              List.iter
+                                (*for each argument list*) 
+                                (fun arg_list ->
+                                  let (value, env_tmp) = 
+                                    model_check' phi lts arg_list map v_lvl (indent ^ "   " ^ "  ")
+                                    (*value and (updated env) of approx for current argument*) 
+                                  in
+                                  let defined_args_tmp = HO.get_defined_arguments (VarMap.get x env_tmp) in
+                                    List.iter (*add new arguments to update, which occured first time in this iteration*) 
+                                    (fun arg_list_tmp -> 
+                                      update := 
+                                      HO.set_value_for_args 
+                                        (HO.get_value_for_args (VarMap.get x env_tmp) arg_list_tmp) 
+                                        !update arg_list_tmp
+                                    ) 
+                                  (List.filter (fun x -> not (List.mem x defined_args)) defined_args_tmp);
+                                  update := HO.set_value_for_args (value) !update arg_list
+                                ) 
+                                defined_args;
+                              if HO.compare !update (VarMap.get x map) == 0 then
+                              begin (*last and second to last iteration are equal *)
+                                map
+                              end else
+                              begin (*last and second to last iteration differ *)
+                                repeat_until (VarMap.set x !update map)
+                              end
+                            in
+                            let initialized_map = VarMap.set x 
+                                  (HO.set_value_for_args 
+                                    (HO.full_base lts)
+                                    (match var_t with F.Base -> HO.full_base lts | _ -> HO.empty_fun) args) 
+                                    env 
+                            in
+                            let approx = VarMap.get x (repeat_until initialized_map) in
+                            (match HO.get_value_for_args approx args with
+                              HO.Base ns -> (HO.Base ns,env)
+                            | HO.Fun(map)-> assert false)
 
   | F.Lambda(var,var_t,phi) -> model_check' phi lts (List.tl args) (VarMap.set (F.Var(var,var_t,F.NoFP)) (List.hd args) env) v_lvl ind
 

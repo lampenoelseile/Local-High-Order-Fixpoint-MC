@@ -33,7 +33,10 @@ module HO : sig
   | Fun of (hot,hot) TreeMap.t
 
   val compare : hot -> hot -> int
+
   val empty_base : t -> hot
+  val full_base : t -> hot 
+  
   val empty_fun : hot
 
   val to_string : ?max_length:int -> hot -> string
