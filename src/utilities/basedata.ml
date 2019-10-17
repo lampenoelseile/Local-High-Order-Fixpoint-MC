@@ -87,7 +87,3 @@ module PropSet = struct
 
   let to_string ps = "["^(String.concat "," (as_string_list ps))^"]"
 end
-
-module NodeSetBDD = struct
-  type t = MLBDD.t
-end

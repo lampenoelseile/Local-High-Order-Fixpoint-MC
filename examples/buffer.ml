@@ -1,7 +1,6 @@
 open Mc
 open Hfl
-open Lts
-module V = Verbose
+  module F = Formula
 open Basedata
 
 let build_named_lts order transitions flush_mark =
@@ -237,7 +236,6 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
 
 let _ =
   let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
-  let lts = build_named_lts 2 ["0";"1"] "#" in
-  let lts_broken = Lts.add_transition lts "0" (Node.NamedNode "r0") (Node.NamedNode ("r1")) 
+  let lts = Lts.to_bddlts(build_named_lts 2 ["0";"1"] "#") 
   in
   model_check ~v_lvl:V.Info formula lts;

@@ -68,37 +68,21 @@ module Formula = struct
     (String.sub value 0 (max_length / 2)) ^ " ... " 
     ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
 end
-  
+
 module Semantics = struct
+  
   type t =
-    | Base of NodeSet.t
-    | Fun of (t,t) TreeMap.t
-  
-  let rec to_string ?(max_length = 200) sem = 
-    match sem with
-    | Base(ns) -> NodeSet.to_string ns
-    | Fun(map) -> let value = 
-                    (TreeMap.fold 
-                      (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") 
-                      map "["
-                    ) 
-                    ^ "]"
-                  in
-                  let val_length = String.length value in
-                  if val_length <= max_length-3 then
-                    value
-                  else
-                  (String.sub value 0 (max_length / 2)) ^ " ... " 
-                  ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
+    Base of MLBDD.t
+  | Fun of (t,t) TreeMap.t
 
-
-  
   let rec compare = function
-    Base ns_one ->  (function
-                  Base ns_two -> NodeSet.compare ns_one ns_two
+      Base ns_one ->  (function
+                  Base ns_two -> if MLBDD.equal ns_one ns_two then 0 
+                                 else Int.compare (MLBDD.id ns_one) (MLBDD.id ns_two) (*TODO COMPARE EVEN IF REDUCED LOL?! *)
                   | Fun map -> assert false)
+
     | Fun map_one -> (function
-                      Base ns_two -> assert false
+                        Base ns_two -> assert false
                       | Fun map_two -> let keys_one = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
                               (TreeMap.to_key_iterator map_one)) in
                               let keys_two = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
@@ -115,16 +99,38 @@ module Semantics = struct
                                       ) 
                               in 
                               helper keys_one keys_two            
-                      )
+                        )
+  
+  let rec to_string ?(max_length = 10000) sem = 
+    match sem with
+    | Base(ns) -> MLBDD.to_string ns
+    | Fun(map) -> let value = 
+                    (TreeMap.fold 
+                      (fun key value str -> str ^ "[" ^ to_string key ^ "->" ^ to_string value ^ "],") 
+                      map "["
+                    ) 
+                    ^ "]"
+                  in
+                  let val_length = String.length value in
+                  if val_length <= max_length-3 then
+                    value
+                  else
+                  (String.sub value 0 (max_length / 2)) ^ " ... " 
+                  ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
 
-  let empty_base = Base(NodeSet.empty)
-  let empty_fun = Fun(TreeMap.empty compare)
+  let empty_base lts = 
+    Base (MLBDD.dfalse (Bddlts.get_man lts))
+  
+  let full_base lts =
+    Base (MLBDD.dtrue (Bddlts.get_man lts))
+  
+  let empty_fun = Fun (TreeMap.empty compare)
 
   let rec is_defined_for_args = function
     | Base(ns) -> (function
                   | [] -> true
                   | _ ->  assert false)
-    | Fun(map) -> (function
+    | Fun (map) -> (function
                   | [] -> assert false
                   | h :: [] -> TreeMap.mem h map 
                   | h :: t ->  let value = TreeMap.mem h map in
@@ -152,10 +158,6 @@ module Semantics = struct
                                   let new_map = empty_fun in 
                                   Fun(TreeMap.add h (set_value_for_args value new_map t) map))
   
-  let rec from_list_of_pairs = function
-    [] -> empty_fun
-    | h :: t -> let (arg,value) = h in set_value_for_args value (from_list_of_pairs t) [arg]
-  
   let rec get_defined_arguments = function
     Base(ns) -> [[]]
   | Fun(map) -> if TreeMap.is_empty map then []
@@ -174,35 +176,34 @@ module Semantics = struct
                     [] 
                     args
                 end
-
-end
-
-(*SET OF SEMANTICS *)
-module SemanticsSet = struct
-  type t = Semantics.t TreeSet.t
-
-  let empty = TreeSet.empty Semantics.compare
-  let add = TreeSet.add
-  let iter = TreeSet.iter
-  let fold = TreeSet.fold
-  let union = TreeSet.union
-  let elements = TreeSet.elements
-
-  let to_string sems =
-    (fold (fun sem str -> match sem with
-                            Semantics.Base(ns) -> str ^ Semantics.to_string (Base ns)^ ","
-                          | Semantics.Fun(map) -> str ^ Semantics.to_string (Fun map)^ "," ) 
-          sems "[") ^ "]"
   
-    let rec all_of_type lts = function
-      Formula.Base -> NodeSet.fold_subsets (fun ns sems -> add (Semantics.Base ns) sems) (Lts.get_all_nodes lts) empty
+  let rec from_list_of_pairs = function
+    [] -> empty_fun
+    | h :: t -> let (arg,value) = h in set_value_for_args value (from_list_of_pairs t) [arg]
+
+  let rec all_of_type lts = function
+      Formula.Base ->   let comp_base_bdd bdd1 bdd2 =
+                          Int.compare (MLBDD.hash bdd1) (MLBDD.hash bdd2)
+                        in
+                        TreeSet.fold_subsets
+                          (fun sub bdd_list -> 
+                            Base(TreeSet.fold
+                              (fun elem bdd -> 
+                                MLBDD.dor elem bdd
+                              )
+                              sub
+                              (MLBDD.dfalse (Bddlts.get_man lts))) :: bdd_list)
+                          (TreeSet.of_list comp_base_bdd (Bddlts.get_statescoded lts))
+                          []
+                          
+
     | Formula.Fun(arg_t, val_t) -> let all_arguments = all_of_type lts arg_t in
                                    let all_values = all_of_type lts val_t in
                                    let rec helper arguments values pairs =
                                     match arguments with
-                                      | [] -> empty
-                                      | h :: [] -> List.fold_left (fun val_sems value -> add (Semantics.from_list_of_pairs ((h,value)::pairs)) val_sems) empty values
-                                      | h :: t -> List.fold_left (fun val_sems value -> union val_sems (helper t values ((h, value) :: pairs))) empty values
+                                      | [] -> []
+                                      | h :: [] -> List.fold_left (fun val_sems value -> (from_list_of_pairs ((h,value)::pairs)) :: val_sems) [] values
+                                      | h :: t -> List.fold_left (fun val_sems value -> val_sems @ (helper t values ((h, value) :: pairs))) [] values
                                    in
-                                   helper (elements all_arguments) (elements all_values) [] (* TODO explain *)
+                                   helper (all_arguments) (all_values) [] (* TODO explain *)
 end

@@ -3,6 +3,7 @@ open Tcsbasedata
 open Tcsset
 open Basedata
 open Tools
+open Hfl
 
 type transkey =
 (* type to distinguish if transition map contains e.g. p pred or p succ *)
@@ -32,6 +33,7 @@ module TransitionMap = struct
 
   let empty = TreeMap.empty compare
 
+  let fold = TreeMap.fold
 
   let get_tpredecessors_of_node tm trans node =
   (* returns predecessors of some node for transition trans. 
@@ -90,6 +92,8 @@ module PropMap = struct
 
   let empty = TreeMap.empty compare
   let find = TreeMap.find
+  let fold = TreeMap.fold
+
   let get_keys_as_list pm =
     let l = ref [] in
     TreeMap.iter (fun k v -> l := k :: !l) pm;
@@ -107,6 +111,7 @@ module PropMap = struct
     match TreeMap.find_opt prop pm with
     | None -> TreeMap.add prop (NodeSet.add node NodeSet.empty) pm
     | Some(value) -> TreeMap.add prop (NodeSet.add node value) pm
+  
 end
 
 type t = {nodes : NodeSet.t; propositions : PropMap.t; transitions : TransitionMap.t}
@@ -213,3 +218,45 @@ let to_string lts =
                   str := !str ^ " props " ^ (PropSet.to_string (PropMap.get_props_of_node lts.propositions n)); 
                   string_rep := String.concat "\n" [!string_rep;!str]) lts.nodes;
   !string_rep
+
+let to_bddlts lts =
+  let lts = make_simple lts in 
+  let bddlts = Bddlts.create (Basedata.NodeSet.size(lts.nodes)) in 
+  let bddlts = PropMap.fold
+                  (fun prop nodeset bddlts1 -> 
+                    NodeSet.fold 
+                      (fun bddlts2 node ->
+                        Bddlts.add_proposition bddlts2 prop 
+                          (match node with
+                            Node.SimpleNode i -> i
+                          | _ -> assert false
+                          )
+                      )
+                      bddlts1
+                      nodeset
+                  )
+                  lts.propositions
+                  bddlts
+  in
+  let bddlts =  NodeSet.fold 
+                  (fun bddlts node ->
+                    match node with 
+                      Node.SimpleNode n ->  TransitionMap.fold
+                                              (fun trans nm bddlts ->
+                                                match trans with 
+                                                  TransIn t -> NodeSet.fold
+                                                                (fun bddlts node2 ->
+                                                                  Bddlts.add_transition bddlts t
+                                                                  (match node2 with Node.SimpleNode n' -> n' | _ -> assert false) n
+                                                                )
+                                                                bddlts
+                                                                (TransitionMap.get_tpredecessors_of_node lts.transitions t node)
+                                                | _ -> bddlts
+                                              )
+                                              lts.transitions
+                                              bddlts
+                    | _ -> assert false
+                  )
+                  bddlts
+                  (lts.nodes)
+  in bddlts

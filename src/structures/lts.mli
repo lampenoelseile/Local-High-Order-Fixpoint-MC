@@ -1,4 +1,5 @@
 open Basedata
+open Hfl
 (** Simple LTS with just one kind of transition and without specified initial states*)
 
 (** LTS type *)
@@ -90,3 +91,5 @@ val to_string : t -> string
 val make_simple : t -> t
 
 val turn_transitions : t -> t
+
+val to_bddlts : t -> Bddlts.t
