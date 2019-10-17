@@ -2,7 +2,7 @@ open Mc
 open Hfl
   module F = Formula
 open Basedata
-
+  module V = Verbose
 let build_named_lts order transitions flush_mark =
 let open Node in
   let rec write depth lts =

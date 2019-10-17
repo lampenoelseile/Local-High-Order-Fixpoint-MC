@@ -78,30 +78,18 @@ module Semantics = struct
   let rec compare = function
       Base ns_one ->  (function
                   Base ns_two -> if MLBDD.equal ns_one ns_two then 0 
-                                 else Int.compare (MLBDD.id ns_one) (MLBDD.id ns_two) (*TODO COMPARE EVEN IF REDUCED LOL?! *)
+                                 else Int.compare (MLBDD.id ns_one) (MLBDD.id ns_two)
                   | Fun map -> assert false)
 
     | Fun map_one -> (function
                         Base ns_two -> assert false
-                      | Fun map_two -> let keys_one = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
-                              (TreeMap.to_key_iterator map_one)) in
-                              let keys_two = List.sort (fun a b -> compare a b) (Tcsbasedata.Iterators.to_list 
-                              (TreeMap.to_key_iterator map_two)) in
-                              let rec helper = function
-                                h1 :: t1 -> (function 
-                                            h2 :: t2 -> let value = compare (TreeMap.find h1 map_one) (TreeMap.find h2 map_two) 
-                                                        in if value != 0 then value else helper t1 t2
-                                          |  [] -> 1
-                                          )
-                              | [] -> (function 
-                                        h :: t -> -1
-                                      | [] -> 0
-                                      ) 
-                              in 
-                              helper keys_one keys_two            
+                      | Fun map_two -> TreeMap.compare (fun t1 t2 -> compare t1 t2) map_one map_two   
                         )
   
-  let rec to_string ?(max_length = 10000) sem = 
+  let equal s1 s2 =
+    compare s1 s2 == 0
+
+  let rec to_string ?(max_length = 200) sem = 
     match sem with
     | Base(ns) -> MLBDD.to_string ns
     | Fun(map) -> let value = 
@@ -118,11 +106,9 @@ module Semantics = struct
                   (String.sub value 0 (max_length / 2)) ^ " ... " 
                   ^ (String.sub value (val_length - (max_length / 2)) (max_length/2))
 
-  let empty_base lts = 
-    Base (MLBDD.dfalse (Bddlts.get_man lts))
+  let empty_base lts = Base (MLBDD.dfalse (Bddlts.get_man lts))
   
-  let full_base lts =
-    Base (MLBDD.dtrue (Bddlts.get_man lts))
+  let full_base lts = Base (Bddlts.get_allstates_bdd lts)
   
   let empty_fun = Fun (TreeMap.empty compare)
 
@@ -193,10 +179,10 @@ module Semantics = struct
                               )
                               sub
                               (MLBDD.dfalse (Bddlts.get_man lts))) :: bdd_list)
-                          (TreeSet.of_list comp_base_bdd (Bddlts.get_statescoded lts))
+                          (TreeSet.of_list comp_base_bdd (Bddlts.get_statescoded lts))  (*TODO: Do not use TreeSet -> Speedup with efficient recursion.
+                                                                                                Calculate once and reuse. 
+                                                                                        *)
                           []
-                          
-
     | Formula.Fun(arg_t, val_t) -> let all_arguments = all_of_type lts arg_t in
                                    let all_values = all_of_type lts val_t in
                                    let rec helper arguments values pairs =
@@ -205,5 +191,5 @@ module Semantics = struct
                                       | h :: [] -> List.fold_left (fun val_sems value -> (from_list_of_pairs ((h,value)::pairs)) :: val_sems) [] values
                                       | h :: t -> List.fold_left (fun val_sems value -> val_sems @ (helper t values ((h, value) :: pairs))) [] values
                                    in
-                                   helper (all_arguments) (all_values) [] (* TODO explain *)
+                                   helper (all_arguments) (all_values) []
 end

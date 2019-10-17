@@ -2,19 +2,9 @@ open Tcsset
 open Hfl
   module F = Formula
   module S = Semantics
-
 module V = Verbose 
 
-module type VarMapInt = sig 
-  type t 
-  val empty : t
-  val mem : F.t -> t -> bool
-  val set : F.t -> S.t -> t -> t
-  val get : F.t -> t -> S.t
-
-end
-
-module VarMap : VarMapInt  = struct (*TODO: Add typecheck between var_t and value and exceptions*)
+module VarMap = struct    (*TODO: Add typecheck between var_t and value and exceptions*)
   (*Simple map, which pairs variable (formula) with its current (semantic) value. 
     Based on TreeMap. (SEE TCSLib)
   *)
@@ -107,7 +97,7 @@ let model_check formula lts arguments environment v_lvl indent =
                                                   (MLBDD.dand 
                                                     (Bddlts.get_trans lts trans) 
                                                     (MLBDD.permute (Bddlts.get_tovars_ids_as_array lts) bdd)
-                                                  ) (Bddlts.get_truestates_bdd lts)
+                                                  ) (Bddlts.get_allstates_bdd lts)
                                                   )
                                                   ), (*TODO encapsulate into bddlts*)
                                                 env
@@ -125,7 +115,7 @@ let model_check formula lts arguments environment v_lvl indent =
                                                 (MLBDD.dnot (Bddlts.get_trans lts trans)) 
                                                 (MLBDD.permute (Bddlts.get_tovars_ids_as_array lts) bdd)
                                               )
-                                              (Bddlts.get_truestates_bdd lts)
+                                              (Bddlts.get_allstates_bdd lts)
                                             )
                                           ), (*TODO encapsulate into bddlts*)
                                           env
@@ -161,7 +151,7 @@ let model_check formula lts arguments environment v_lvl indent =
                                   update := S.set_value_for_args (value) !update arg_list
                                 ) 
                                 defined_args;
-                              if S.compare !update (VarMap.get x map) == 0 then
+                              if S.equal !update (VarMap.get x map) then
                               begin (*last and second to last iteration are equal *)
                                 map
                               end else
@@ -210,7 +200,7 @@ let model_check formula lts arguments environment v_lvl indent =
                                   update := S.set_value_for_args (value) !update arg_list
                                 ) 
                                 defined_args;
-                              if S.compare !update (VarMap.get x map) == 0 then
+                              if S.equal !update (VarMap.get x map) then
                               begin (*last and second to last iteration are equal *)
                                 map
                               end else
@@ -270,7 +260,6 @@ let model_check formula lts arguments environment v_lvl indent =
   let value = helper formula lts args env v_lvl in
   value
   in
-
   let (bdd,_) = model_check' formula lts arguments environment v_lvl indent in
   match bdd with Base bdd -> Bddlts.get_all_sat_states lts bdd | _ -> assert false
 

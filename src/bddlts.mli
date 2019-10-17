@@ -16,7 +16,7 @@ val get_prop : t -> string -> MLBDD.t
 
 val get_trans : t -> string -> MLBDD.t
 
-val get_truestates_bdd : t -> MLBDD.t
+val get_allstates_bdd : t -> MLBDD.t
 
 val get_tovars_support : t -> MLBDD.support
 

@@ -4,13 +4,14 @@ type t =
   {
     manager: MLBDD.man;                         (*BDD Manager (see MLBDD Library)*)
     basevars: MLBDD.t list;                     (*List of boolean vars, representing states (e.g. 011 represents state 3) - lefttoright -> hightolow!*)
-    basevarsIDs: int list;
+    basevarsIDs: int list;                      (*Ids of basevars.*)
     basevarsTo: MLBDD.t list;                   (*Second of boolean vars, representing states. Needed for transition definition - lefttoright -> hightolow!*)
-    basevarsToIDs: int list;
+    basevarsToIDs: int list;                    (*Ids of basevarsTo.*)
     basevarsToSupport: MLBDD.support;           (*Needed for quantification in modal cases.*)
     propositions: (string,MLBDD.t) TreeMap.t;   (*Map that links a proposition (string) to its BDD representation*)
     transitions: (string,MLBDD.t) TreeMap.t;    (*Map that links a transition (string) to its BDD representation*)
-    statescoded: MLBDD.t list
+    statescoded: MLBDD.t list;                  (*Each state as binary encoding of the basevars*)
+    allstates: MLBDD.t                          (*BDD representing all states to avoid undefined ones because of too much bits (big AND)*)
   }
 
 type state = int
@@ -46,6 +47,13 @@ let create number_of_states =
                   range_of_basevarsTo_ids
                   [];
   in
+  let statescoded = List.fold_left
+                    (fun code_list state -> 
+                      bdd_fom_bin_rep basevars (Tools.int_to_binary_list state) :: code_list
+                    )
+                    []
+                    (Tools.range 0 (number_of_states-1))
+  in
   {
     manager = man;
     basevars =  basevars;
@@ -55,12 +63,13 @@ let create number_of_states =
     basevarsToSupport = MLBDD.support_of_list range_of_basevarsTo_ids;
     propositions = TreeMap.empty (String.compare);
     transitions = TreeMap.empty (String.compare);
-    statescoded = List.fold_left
-                    (fun code_list state -> 
-                      bdd_fom_bin_rep basevars (Tools.int_to_binary_list state) :: code_list
-                    )
-                    []
-                    (Tools.range 0 (number_of_states-1))
+    statescoded = statescoded;
+    allstates = List.fold_left
+    (fun bdd elem ->
+      MLBDD.dor bdd elem
+    )
+    (List.hd statescoded)
+    (List.tl statescoded)
   }
 
 let add_proposition lts proposition state = 
@@ -74,12 +83,13 @@ let add_proposition lts proposition state =
       basevarsTo = lts.basevarsTo;
       basevarsToIDs = lts.basevarsToIDs;
       basevarsToSupport = lts.basevarsToSupport;
-      propositions =  TreeMap.add 
+      propositions =  (TreeMap.add 
                         proposition
                         (MLBDD.dor prop_bdd (bdd_fom_bin_rep lts.basevars binary_rep))
-                        lts.propositions;
+                        lts.propositions);
       transitions = lts.transitions;
-      statescoded = lts.statescoded
+      statescoded = lts.statescoded;
+      allstates = lts.allstates
     }
   else
     { 
@@ -89,12 +99,13 @@ let add_proposition lts proposition state =
       basevarsTo = lts.basevarsTo;
       basevarsToIDs = lts.basevarsToIDs;
       basevarsToSupport = lts.basevarsToSupport;
-      propositions =  TreeMap.add 
+      propositions =  (TreeMap.add 
                         proposition
                         (bdd_fom_bin_rep lts.basevars binary_rep)
-                        lts.propositions;
+                        lts.propositions);
       transitions = lts.transitions;
-      statescoded = lts.statescoded
+      statescoded = lts.statescoded;
+      allstates = lts.allstates
     }
 
 let add_transition lts transition from_state to_state =
@@ -121,7 +132,8 @@ let add_transition lts transition from_state to_state =
                         )
                       )
                       lts.transitions;
-      statescoded = lts.statescoded
+      statescoded = lts.statescoded;
+      allstates = lts.allstates
     }
   else
     {
@@ -139,24 +151,24 @@ let add_transition lts transition from_state to_state =
                         (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
                       )
                       lts.transitions;
-      statescoded = lts.statescoded
+      statescoded = lts.statescoded;
+      allstates = lts.allstates
     }
 
 let get_man lts =
   lts.manager 
 
 let get_prop lts proposition =
-  print_endline proposition;
   if TreeMap.mem proposition lts.propositions then 
-    TreeMap.find proposition lts.propositions
+    MLBDD.dand (TreeMap.find proposition lts.propositions) lts.allstates
   else
-    MLBDD.dfalse lts.manager
+    MLBDD.dfalse lts.manager (*TODO: Is this a problem regarding undefined states? *)
 
 let get_trans lts transition =
   if TreeMap.mem transition lts.transitions then 
     TreeMap.find transition lts.transitions
   else
-    MLBDD.dfalse lts.manager
+    MLBDD.dfalse lts.manager (*TODO: Is this a problem regarding undefined states? *)
 
 let get_tovars_support lts = 
   lts.basevarsToSupport
@@ -183,19 +195,14 @@ let basesat_to_int sat =
 let get_tovars lts =
   lts.basevarsTo
 
-let get_truestates_bdd lts =
-  List.fold_left
-    (fun bdd elem ->
-      MLBDD.dor bdd elem
-    )
-    (List.hd lts.statescoded)
-    (List.tl lts.statescoded)
+let get_allstates_bdd lts =
+  lts.allstates
 
 let does_satisfy lts bdd state =
   let state_bdd = bdd_fom_bin_rep lts.basevars (Tools.int_to_binary_list state) in 
   MLBDD.sat (MLBDD.dand bdd state_bdd) <> None
 
-let complete_sat_list sat_list compl_vars_list = (*To get all states from satisfactories, even if bdd is simpliefied / reduced*)
+let complete_sat_list sat_list compl_vars_list = (*To get all satisfying states, even if bdd is simpliefied / reduced*)
   let rec complete list part_l comp_l =
     match (part_l,comp_l) with 
       (hp::tp,hc::tc) ->  let (boolp,varp) = hp in 
