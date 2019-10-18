@@ -1,6 +1,5 @@
 open Basedata
 open Hfl
-(** Simple LTS with just one kind of transition and without specified initial states*)
 
 (** LTS type *)
 type t

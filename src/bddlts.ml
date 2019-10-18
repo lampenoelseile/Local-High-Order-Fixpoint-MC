@@ -124,12 +124,14 @@ let add_transition lts transition from_state to_state =
       propositions = lts.propositions;
       transitions = TreeMap.add
                       transition
-                      (MLBDD.dor 
-                        trans_bdd 
-                        (MLBDD.dand 
-                          (bdd_fom_bin_rep lts.basevars binary_rep_from_state)
-                          (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
-                        )
+                      (
+                        MLBDD.dor 
+                          trans_bdd 
+                          (
+                            MLBDD.dand 
+                              (bdd_fom_bin_rep lts.basevars binary_rep_from_state)
+                              (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
+                          )
                       )
                       lts.transitions;
       statescoded = lts.statescoded;
@@ -146,9 +148,10 @@ let add_transition lts transition from_state to_state =
       propositions = lts.propositions;
       transitions = TreeMap.add
                       transition
-                      (MLBDD.dand 
-                        (bdd_fom_bin_rep lts.basevars binary_rep_from_state)
-                        (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
+                      (
+                        MLBDD.dand 
+                          (bdd_fom_bin_rep lts.basevars binary_rep_from_state)
+                          (bdd_fom_bin_rep lts.basevarsTo binary_rep_to_state)
                       )
                       lts.transitions;
       statescoded = lts.statescoded;
@@ -162,19 +165,13 @@ let get_prop lts proposition =
   if TreeMap.mem proposition lts.propositions then 
     MLBDD.dand (TreeMap.find proposition lts.propositions) lts.allstates
   else
-    MLBDD.dfalse lts.manager (*TODO: Is this a problem regarding undefined states? *)
+    MLBDD.dfalse lts.manager (*TODO: Is this a problem regarding undefined states?*)
 
 let get_trans lts transition =
   if TreeMap.mem transition lts.transitions then 
     TreeMap.find transition lts.transitions
   else
-    MLBDD.dfalse lts.manager (*TODO: Is this a problem regarding undefined states? *)
-
-let get_tovars_support lts = 
-  lts.basevarsToSupport
-
-let get_tovars_ids_as_array lts =
-  Array.of_list lts.basevarsToIDs
+    MLBDD.dfalse lts.manager (*TODO: Is this a problem regarding undefined states?*)
 
 let get_statescoded lts =
   lts.statescoded
@@ -192,17 +189,38 @@ let basesat_to_int sat =
     sat;
   !value
 
-let get_tovars lts =
-  lts.basevarsTo
-
-let get_allstates_bdd lts =
+let get_allstates lts =
   lts.allstates
 
-let does_satisfy lts bdd state =
-  let state_bdd = bdd_fom_bin_rep lts.basevars (Tools.int_to_binary_list state) in 
-  MLBDD.sat (MLBDD.dand bdd state_bdd) <> None
+let get_diamond_trans_of lts trans bdd = 
+  (MLBDD.exists 
+    (lts.basevarsToSupport)
+    ( 
+      MLBDD.dand 
+        (
+          MLBDD.dand 
+            (get_trans lts trans) 
+            (MLBDD.permute (Array.of_list lts.basevarsToIDs) bdd)
+        ) 
+        (lts.allstates)
+    )
+  )
 
-let complete_sat_list sat_list compl_vars_list = (*To get all satisfying states, even if bdd is simpliefied / reduced*)
+let get_box_trans_of lts trans bdd =
+  MLBDD.forall 
+    (lts.basevarsToSupport)
+    (
+      MLBDD.dand
+      (
+        MLBDD.dor
+          (MLBDD.dnot (get_trans lts trans)) 
+          (MLBDD.permute (Array.of_list lts.basevarsToIDs) bdd)
+      )
+      (lts.allstates)
+    )
+  
+let complete_sat_list sat_list compl_vars_list = 
+  (*To get all satisfying states, even if bdd is simpliefied / reduced*)
   let rec complete list part_l comp_l =
     match (part_l,comp_l) with 
       (hp::tp,hc::tc) ->  let (boolp,varp) = hp in 
@@ -214,18 +232,18 @@ let complete_sat_list sat_list compl_vars_list = (*To get all satisfying states,
   in
   complete [] sat_list compl_vars_list
 
-let get_all_sat_states lts bdd = (*TODO: Returns undefined states because of completion *)
+let get_all_sats lts bdd = (*TODO: Returns undefined states because of completion *)
   List.fold_right 
-    (fun sat list ->
-      (basesat_to_int sat) :: list
-    )
+    (fun sat list -> (basesat_to_int sat) :: list)
     (
       List.fold_left
         (fun list sat ->
-          list @ (List.filter (fun elem -> (basesat_to_int elem) < (List.length lts.statescoded)) (complete_sat_list sat lts.basevarsIDs))
+          list @ (List.filter 
+                    (fun elem -> (basesat_to_int elem) < (List.length lts.statescoded)) 
+                    (complete_sat_list sat lts.basevarsIDs))
         )
-      []
-      (MLBDD.allsat bdd)
+        []
+        (MLBDD.allsat bdd)
     )
     []
 
@@ -236,25 +254,27 @@ let to_string lts =
                     (fun key value str ->
                       str ^ key ^ ": {" ^
                         Tools.strip_last_char
-                        (List.fold_left 
-                          (fun str i -> 
-                            str ^ (string_of_int i) ^ ","
-                          ) 
-                          "" 
-                          (List.fold_right 
-                            (fun sat list ->
-                              (basesat_to_int sat) :: list
-                            )
-                            (
-                              List.fold_left
-                                (fun list sat ->
-                                  list @ (complete_sat_list sat lts.basevarsIDs)
+                          (
+                            List.fold_left 
+                              (fun str i -> 
+                                str ^ (string_of_int i) ^ ","
+                              ) 
+                              "" 
+                              (List.fold_right 
+                                (fun sat list ->
+                                  (basesat_to_int sat) :: list
                                 )
-                              []
-                              (MLBDD.allsat value)
-                            )
-                            []
-                          )) 
+                                (
+                                  List.fold_left
+                                    (fun list sat ->
+                                      list @ (complete_sat_list sat lts.basevarsIDs)
+                                    )
+                                    []
+                                    (MLBDD.allsat value)
+                                )
+                                []
+                              )
+                          ) 
                       ^ "}\n"
                     ) 
                     lts.propositions
@@ -263,21 +283,22 @@ let to_string lts =
   let trans_str = "transitions\n" ^
                   TreeMap.fold
                     (fun key value str ->
-                      str ^ List.fold_left
-                              (fun str sat ->
-                                let (from_sat,to_sat) = Tools.split_list_in_half sat in
-                                str ^ (string_of_int (basesat_to_int from_sat)) ^ " --" ^ key ^"--> " 
-                                ^ string_of_int (basesat_to_int to_sat) ^ "\n"
-                              )
-                              ""
-                              (
-                              List.fold_left
-                                (fun list sat ->
-                                  list @ (complete_sat_list sat (lts.basevarsIDs @ lts.basevarsToIDs))
-                                )
-                              []
-                              (MLBDD.allsat value)
+                      str 
+                      ^ List.fold_left
+                          (fun str sat ->
+                            let (from_sat,to_sat) = Tools.split_list_in_half sat in
+                            str ^ (string_of_int (basesat_to_int from_sat)) ^ " --" ^ key ^"--> " 
+                            ^ string_of_int (basesat_to_int to_sat) ^ "\n"
+                          )
+                          ""
+                          (
+                          List.fold_left
+                            (fun list sat ->
+                              list @ (complete_sat_list sat (lts.basevarsIDs @ lts.basevarsToIDs))
                             )
+                            []
+                            (MLBDD.allsat value)
+                          )
                     )
                     lts.transitions
                     ""

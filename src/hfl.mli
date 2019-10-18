@@ -43,7 +43,8 @@ end
 
 module Semantics : sig
   (** interface: Semantics module
-      Represents the semantics of a hfl formula interpreted over some lts (Bddlts)
+      Represents the semantics of a hfl formula interpreted over some lts,
+      which is represented via BDDs (see Bddlts).
   *)
   type t =
     (** type of semantics
