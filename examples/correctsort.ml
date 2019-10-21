@@ -145,5 +145,5 @@ let build_formula ?(v_lvl=V.None) transitions flush_mark =
 
 let _ =
   let formula = build_formula ~v_lvl:V.Info ["0";"1"] "#" in 
-  let lts = Lts.to_bddlts(build_lts ~zero_max_count:2 ~one_max_count:1) in
+  let lts = Lts.to_bddlts(build_lts ~zero_max_count:0 ~one_max_count:0) in
   model_check ~v_lvl:V.Info formula lts;

@@ -229,5 +229,6 @@ module Semantics = struct
                                                   [] 
                                                   values
                                   in
-                                   helper (all_arguments) (all_values) []
+                                  let all = ref [] in 
+                                  helper (all_arguments) (all_values) []
 end
