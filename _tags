@@ -1,3 +1,5 @@
 #not this naive solution
 
+<src> or <src/utilities> or <src/deprecated>: include
+
 true: package(TCSLib), package(str), package(unix)
